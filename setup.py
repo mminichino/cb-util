@@ -4,7 +4,7 @@ setup(
     name='cbutil',
     version='1.0.0',
     packages=['cbutil'],
-    url='https://github.com/mminichino',
+    url='https://github.com/mminichino/cb-util',
     license='MIT License',
     author='Michael Minichino',
     python_requires='>=3.9',
