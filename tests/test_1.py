@@ -2,7 +2,7 @@
 
 import warnings
 import pytest
-from cbutil.cb_connect import CBConnect
+from cbcmgr.cb_connect import CBConnect
 
 
 warnings.filterwarnings("ignore")

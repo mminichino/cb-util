@@ -10,7 +10,7 @@ parent = os.path.dirname(current)
 sys.path.append(parent)
 sys.path.append(current)
 
-from cbutil.cb_connect import CBConnect
+from cbcmgr.cb_connect import CBConnect
 from conftest import pytest_sessionstart, pytest_sessionfinish
 
 
