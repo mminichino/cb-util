@@ -15,7 +15,7 @@ import hashlib
 from attr.validators import instance_of as io, optional
 from typing import Protocol, Iterable
 from couchbase.cluster import Cluster
-from couchbase.management.buckets import CreateBucketSettings, BucketType
+from couchbase.management.buckets import CreateBucketSettings, BucketType, StorageBackend
 from couchbase.management.collections import CollectionSpec
 import couchbase.subdocument as SD
 from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundException, DocumentNotFoundException,
@@ -129,12 +129,14 @@ class CBConnect(CBSession):
             raise BucketStatsError(f"can not get bucket {bucket} stats: {err}")
 
     @retry()
-    def create_bucket(self, name, quota=256):
+    def create_bucket(self, name, quota: int = 256, replicas: int = 0):
         self.logger.debug(f"create_bucket: create bucket {name}")
         try:
             bm = self._cluster.buckets()
             bm.create_bucket(CreateBucketSettings(name=name,
                                                   bucket_type=BucketType.COUCHBASE,
+                                                  storage_backend=StorageBackend.COUCHSTORE,
+                                                  num_replicas=replicas,
                                                   ram_quota_mb=quota))
         except BucketAlreadyExistsException:
             pass
