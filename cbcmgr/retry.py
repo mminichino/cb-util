@@ -8,6 +8,21 @@ from typing import Callable
 from functools import wraps
 
 
+def retry_inline(func, *args, retry_count=10, factor=0.01, **kwargs):
+    logger = logging.getLogger(retry_inline.__name__)
+    for retry_number in range(retry_count + 1):
+        try:
+            return func(*args, **kwargs)
+        except Exception as err:
+            if retry_number == retry_count:
+                logger.debug(f"{func.__name__} retry limit exceeded: {err}")
+                raise
+            logger.debug(f"{func.__name__} will retry, number {retry_number + 1}")
+            wait = factor
+            wait *= (2 ** (retry_number + 1))
+            time.sleep(wait)
+
+
 def retry(retry_count=10,
           factor=0.01,
           allow_list=None,
@@ -33,7 +48,7 @@ def retry(retry_count=10,
                             logger.debug(f"{func.__name__} retry limit exceeded")
                             raise
 
-                        logger.debug(f"{func.__name__} [sync] will retry, number {retry_number + 1}")
+                        logger.debug(f"{func.__name__} will retry, number {retry_number + 1}")
                         wait = factor
                         wait *= (2 ** (retry_number + 1))
                         time.sleep(wait)
@@ -56,7 +71,7 @@ def retry(retry_count=10,
                             logger.debug(f"{func.__name__} retry limit exceeded")
                             raise
 
-                        logger.debug(f"{func.__name__} [async] will retry, number {retry_number + 1}")
+                        logger.debug(f"{func.__name__} will retry, number {retry_number + 1}")
                         wait = factor
                         wait *= (2 ** (retry_number + 1))
                         time.sleep(wait)

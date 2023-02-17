@@ -5,7 +5,7 @@ from .exceptions import (BucketWaitException, IndexNotReady, IndexNotFoundError,
                          CollectionNameNotFound, IndexExistsError, CollectionCountError, QueryArgumentsError,
                          QueryEmptyException, IndexStatError, BucketStatsError, ClusterNotConnected, BucketNotConnected,
                          ScopeNotConnected, CollectionSubdocUpsertError)
-from .retry import retry
+from .retry import retry, retry_inline
 from .cb_session import CBSession
 from .httpsessionmgr import APISession
 from datetime import timedelta
@@ -23,9 +23,11 @@ from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundExceptio
                                   BucketAlreadyExistsException, BucketNotFoundException,
                                   WatchQueryIndexTimeoutException, ScopeAlreadyExistsException,
                                   CollectionAlreadyExistsException, CollectionNotFoundException)
-from couchbase.options import (QueryOptions, LockMode, ClusterOptions, TLSVerifyMode)
+from couchbase.options import (QueryOptions, LockMode, ClusterOptions, TLSVerifyMode, WaitUntilReadyOptions)
 from couchbase.management.queries import (CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions,
                                           WatchQueryIndexOptions, DropPrimaryQueryIndexOptions, DropQueryIndexOptions)
+from couchbase.management.options import CreateBucketOptions, CreateScopeOptions, CreateCollectionOptions
+from couchbase.diagnostics import ServiceType
 
 
 @attr.s
@@ -72,26 +74,24 @@ class CBConnect(CBSession):
         else:
             self.cluster_options.update(network="default")
 
-    @retry(factor=0.5)
     def connect(self):
         self.logger.debug(f"connect: connect string {self.cb_connect_string}")
-        cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
-        self._cluster = cluster
+        self._cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
+        self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
         return self
 
-    @retry()
     def bucket(self, name):
         self.logger.debug(f"bucket: connecting bucket {name}")
         if self._cluster:
-            self._bucket = self._cluster.bucket(name)
+            self._bucket = retry_inline(self._cluster.bucket, name)
         else:
             raise ClusterNotConnected("no cluster connected")
         return self
 
-    @retry()
     def scope(self, name="_default"):
         if self._bucket:
             self.logger.debug(f"scope: connecting scope {name}")
+            self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
             self._scope = self._bucket.scope(name)
             self._scope_name = name
         else:
@@ -101,6 +101,7 @@ class CBConnect(CBSession):
     def collection(self, name="_default"):
         if self._scope:
             self.logger.debug(f"collection: connecting collection {name}")
+            self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
             self._collection = self._scope.collection(name)
             self._collection_name = name
         else:
@@ -128,7 +129,6 @@ class CBConnect(CBSession):
         except Exception as err:
             raise BucketStatsError(f"can not get bucket {bucket} stats: {err}")
 
-    @retry()
     def create_bucket(self, name, quota: int = 256, replicas: int = 0):
         self.logger.debug(f"create_bucket: create bucket {name}")
         try:
@@ -137,7 +137,8 @@ class CBConnect(CBSession):
                                                   bucket_type=BucketType.COUCHBASE,
                                                   storage_backend=StorageBackend.COUCHSTORE,
                                                   num_replicas=replicas,
-                                                  ram_quota_mb=quota))
+                                                  ram_quota_mb=quota),
+                             CreateBucketOptions(timeout=timedelta(seconds=25)))
         except BucketAlreadyExistsException:
             pass
         return self.bucket(name)
@@ -151,28 +152,41 @@ class CBConnect(CBSession):
         except BucketNotFoundException:
             pass
 
-    @retry()
     def create_scope(self, name):
         self.logger.debug(f"create_scope: create scope {name}")
         try:
             if name != "_default":
                 cm = self._bucket.collections()
-                cm.create_scope(name)
+                cm.create_scope(name, CreateScopeOptions(timeout=timedelta(seconds=25)))
         except ScopeAlreadyExistsException:
             pass
         return self.scope(name)
 
-    @retry()
     def create_collection(self, name):
         self.logger.debug(f"create_collection: create collection {name}")
         try:
             if name != "_default":
                 collection_spec = CollectionSpec(name, scope_name=self._scope.name)
                 cm = self._bucket.collections()
-                cm.create_collection(collection_spec)
+                cm.create_collection(collection_spec, CreateCollectionOptions(timeout=timedelta(seconds=25)))
+                retry_inline(self.get_collection, cm, name)
         except CollectionAlreadyExistsException:
             pass
         return self.collection(name)
+
+    @staticmethod
+    def get_scope(cm, scope_name):
+        return next((s for s in cm.get_all_scopes() if s.name == scope_name), None)
+
+    def get_collection(self, cm, collection_name):
+        collection = None
+        scope = self.get_scope(cm, self._scope.name)
+        if scope:
+            collection = next((c for c in scope.collections if c.name == collection_name), None)
+        if not collection:
+            raise CollectionNameNotFound(f"collection {collection_name} not found")
+        else:
+            return collection
 
     @retry()
     def drop_collection(self, name):
@@ -195,7 +209,6 @@ class CBConnect(CBSession):
                     raise CollectionCountException(f"expect count {expect_count} but current count is {count}")
             return count
         except Exception as err:
-            self.logger.error(f"collection_count: error occurred: {err}")
             raise CollectionCountError(f"can not get item count for {self.keyspace}: {err}")
 
     @retry()
@@ -211,6 +224,7 @@ class CBConnect(CBSession):
     @retry()
     def cb_upsert(self, key, document):
         try:
+            self.logger.debug(f"cb_upsert: key {key}")
             document_id = self.construct_key(key)
             result = self._collection.upsert(document_id, document)
             self.logger.debug(f"cb_upsert: {document_id}: cas {result.cas}")
@@ -256,6 +270,7 @@ class CBConnect(CBSession):
         query = self.query_sql_constructor(field, where, value, sql)
         contents = []
         try:
+            self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.Query]))
             self.logger.debug(f"cb_query: running query: {query}")
             result = self._cluster.query(query, QueryOptions(metrics=False, adhoc=True))
             for item in result:
