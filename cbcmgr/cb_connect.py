@@ -7,6 +7,7 @@ from .retry import retry, retry_inline
 from .cb_session import CBSession
 from .httpsessionmgr import APISession
 from datetime import timedelta
+from typing import Union, Dict, Any, List
 import concurrent.futures
 from couchbase.cluster import Cluster
 import couchbase.subdocument as SD
@@ -14,12 +15,15 @@ from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundExceptio
 from couchbase.options import (QueryOptions, LockMode, ClusterOptions, TLSVerifyMode, WaitUntilReadyOptions)
 from couchbase.diagnostics import ServiceType
 
+JSONType = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
+
 
 class CBConnect(CBSession):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_reachable()
+        self.check_cluster()
         self.cluster_options = ClusterOptions(self.auth,
                                               timeout_options=self.timeouts,
                                               tls_verify=TLSVerifyMode.NO_VERIFY,
@@ -29,26 +33,24 @@ class CBConnect(CBSession):
         else:
             self.cluster_options.update(network="default")
 
-    def connect(self, bucket: str = None, scope: str = None, collection: str = None):
+    def connect(self, bucket: str = None, scope: str = "_default", collection: str = "_default"):
         self.logger.debug(f"connect: connect string {self.cb_connect_string}")
         self._cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
         self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue, ServiceType.Management]))
         if bucket:
             self.bucket(bucket)
-        if scope:
             self.scope(scope)
-        if collection:
             self.collection(collection)
         return self
 
-    def bucket(self, name):
+    def bucket(self, name: str):
         self.logger.debug(f"bucket: connecting bucket {name}")
         if self._cluster:
             self._bucket = retry_inline(self._cluster.bucket, name)
         else:
             raise ClusterNotConnected("no cluster connected")
 
-    def scope(self, name="_default"):
+    def scope(self, name: str = "_default"):
         if self._bucket:
             self.logger.debug(f"scope: connecting scope {name}")
             self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
@@ -57,7 +59,7 @@ class CBConnect(CBSession):
         else:
             raise BucketNotConnected("bucket not connected")
 
-    def collection(self, name="_default"):
+    def collection(self, name: str = "_default"):
         if self._scope:
             self.logger.debug(f"collection: connecting collection {name}")
             self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
@@ -80,7 +82,7 @@ class CBConnect(CBSession):
             raise CollectionCountError(f"can not get item count for {self.keyspace}: {err}")
 
     @retry()
-    def bucket_stats(self, bucket):
+    def bucket_stats(self, bucket: str):
         try:
             hostname = self.rally_host_name
             s = APISession(self.username, self.password)
@@ -101,7 +103,7 @@ class CBConnect(CBSession):
             raise BucketWaitException(f"bucket_wait: error: {err}")
 
     @retry()
-    def cb_get(self, key):
+    def cb_get(self, key: Union[int, str]):
         try:
             document_id = self.construct_key(key)
             result = self._collection.get(document_id)
@@ -111,7 +113,7 @@ class CBConnect(CBSession):
             return None
 
     @retry()
-    def cb_upsert(self, key, document):
+    def cb_upsert(self, key: Union[int, str], document: JSONType):
         try:
             self.logger.debug(f"cb_upsert: key {key}")
             document_id = self.construct_key(key)
@@ -122,14 +124,14 @@ class CBConnect(CBSession):
             return None
 
     @retry()
-    def cb_subdoc_upsert(self, key, field, value):
+    def cb_subdoc_upsert(self, key: Union[int, str], field: str, value: JSONType):
         document_id = self.construct_key(key)
         result = self._collection.mutate_in(document_id, [SD.upsert(field, value)])
         self.logger.debug(f"cb_subdoc_upsert: {document_id}: cas {result.cas}")
         return result.content_as[dict]
 
     @retry()
-    def cb_subdoc_multi_upsert(self, key_list, field, value_list):
+    def cb_subdoc_multi_upsert(self, key_list: list, field: str, value_list: list):
         tasks = set()
         executor = concurrent.futures.ThreadPoolExecutor()
         for n in range(len(key_list)):
@@ -142,7 +144,7 @@ class CBConnect(CBSession):
                 except Exception as err:
                     raise CollectionSubdocUpsertError(f"multi upsert error: {err}")
 
-    def query_sql_constructor(self, field=None, where=None, value=None, sql=None):
+    def query_sql_constructor(self, field: str = None, where: str = None, value: str = None, sql: str = None):
         if not where and not sql and field:
             query = "SELECT " + field + " FROM " + self.keyspace + ";"
         elif not sql and field:
@@ -155,7 +157,7 @@ class CBConnect(CBSession):
 
     @retry(
         always_raise_list=(CollectionNameNotFound, QueryArgumentsError, IndexExistsError, QueryIndexNotFoundException))
-    def cb_query(self, field=None, where=None, value=None, sql=None, empty_retry=False):
+    def cb_query(self, field: str = None, where: str = None, value: str = None, sql: str = None, empty_retry: bool = False):
         query = self.query_sql_constructor(field, where, value, sql)
         contents = []
         try:

@@ -13,8 +13,7 @@ import hashlib
 import warnings
 from urllib.parse import urlparse
 from requests.auth import AuthBase
-from .exceptions import NotAuthorized, HTTPForbidden, HTTPNotImplemented, RequestValidationError, InternalServerError, \
-    PaginationDataNotFound, SyncGatewayOperationException
+from .exceptions import (NotAuthorized, HTTPForbidden, HTTPNotImplemented, RequestValidationError, InternalServerError, PaginationDataNotFound, SyncGatewayOperationException)
 
 
 class CapellaToken(object):

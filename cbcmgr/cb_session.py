@@ -5,6 +5,7 @@ from .exceptions import (DNSLookupTimeout, NodeUnreachable, NodeConnectionTimeou
                          NodeConnectionFailed, ClusterKVServiceError, ClusterHealthCheckError, ClusterQueryServiceError,
                          ClusterViewServiceError)
 from .retry import retry
+from .httpsessionmgr import APISession
 import logging
 import socket
 import dns.resolver
@@ -19,6 +20,7 @@ from couchbase.diagnostics import ServiceType, PingState
 class CBSession(object):
 
     def __init__(self, hostname: str, username: str, password: str, ssl=False, external=False):
+        self.cluster_node_count = None
         self.logger = logging.getLogger(self.__class__.__name__)
         self._cluster = None
         self._bucket = None
@@ -35,6 +37,7 @@ class CBSession(object):
         self.use_external_network = external
         self.external_network_present = False
         self.node_list = []
+        self.external_list = []
         self.srv_host_list = []
         self.all_hosts = []
         self.node_cycle = None
@@ -46,7 +49,9 @@ class CBSession(object):
         self.timeouts = ClusterTimeoutOptions(query_timeout=timedelta(seconds=60),
                                               kv_timeout=timedelta(seconds=4),
                                               bootstrap_timeout=timedelta(seconds=4),
-                                              resolve_timeout=timedelta(seconds=4))
+                                              resolve_timeout=timedelta(seconds=4),
+                                              connect_timeout=timedelta(seconds=4),
+                                              management_timeout=timedelta(seconds=4))
 
         if self.ssl:
             self.prefix = "https://"
@@ -119,6 +124,33 @@ class CBSession(object):
             raise NodeUnreachable(f"can not connect to node {self.rally_cluster_node}: {err}")
 
         return True
+
+    def check_cluster(self):
+        s = APISession(self.username, self.password)
+        s.set_host(self.rally_host_name, self.ssl, self.admin_port)
+        self.cluster_info = s.api_get('/pools/default').json()
+        self.process_cluster_data()
+
+    def process_cluster_data(self):
+        rally_ip = socket.gethostbyname(self.rally_host_name)
+
+        if not self.cluster_info:
+            self.logger.debug("process_cluster_data: no cluster info")
+            return
+
+        self.cluster_node_count = range(len(self.cluster_info['nodes']))
+        self.sw_version = self.cluster_info['nodes'][0]['version']
+
+        for node in self.cluster_info['nodes']:
+            node_name = node.get("configuredHostname").split(':')[0]
+            alternate_address = node.get("alternateAddresses", {}).get("external", {}).get("hostname")
+            self.node_list.append(node_name)
+            if alternate_address:
+                self.external_list.append(alternate_address)
+                external_ip = socket.gethostbyname(alternate_address)
+                if rally_ip == external_ip:
+                    self.logger.debug(f"external address {rally_ip} detected")
+                    self.use_external_network = True
 
     @retry(retry_count=5)
     def check_node_connectivity(self, hostname, port):
