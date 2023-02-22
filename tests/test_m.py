@@ -4,6 +4,7 @@ import warnings
 import sys
 import argparse
 import os
+import logging
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -11,8 +12,10 @@ sys.path.append(parent)
 sys.path.append(current)
 
 from cbcmgr.cb_connect import CBConnect
+from cbcmgr.cb_management import CBManager
 from conftest import pytest_sessionstart, pytest_sessionfinish
 
+logger = logging.getLogger()
 
 warnings.filterwarnings("ignore")
 document = {
@@ -66,49 +69,65 @@ def manual_1(hostname, bucket, tls, scope, collection):
     replica_count = 0
 
     print("=> Connect")
-    db = CBConnect(hostname, "Administrator", "password", ssl=tls)\
-        .connect()\
-        .create_bucket(bucket)\
-        .create_scope(scope)\
-        .create_collection(collection)
+    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
+    dbm.create_bucket(bucket)
+    dbm.create_scope(scope)
+    dbm.create_collection(collection)
+    dbc = CBConnect(hostname, "Administrator", "password", ssl=False).connect(bucket, scope, collection)
     print("=> Create indexes")
-    db.cb_create_primary_index(replica=replica_count)
-    index_name = db.cb_create_index(fields=["data"], replica=replica_count)
-    db.index_wait()
-    db.index_wait(index_name)
-    result = db.is_index()
+    dbm.cb_create_primary_index(replica=replica_count)
+    index_name = dbm.cb_create_index(fields=["data"], replica=replica_count)
+    dbm.index_wait()
+    dbm.index_wait(index_name)
+    result = dbm.is_index()
     assert result is True
-    result = db.is_index(index_name)
+    result = dbm.is_index(index_name)
     assert result is True
-    db.cb_upsert("test::1", document)
-    db.bucket_wait(bucket, count=1)
+    dbc.cb_upsert("test::1", document)
+    dbc.bucket_wait(bucket, count=1)
     print("=> Data tests")
-    result = db.cb_get("test::1")
+    result = dbc.cb_get("test::1")
     assert result == document
-    result = db.collection_count(expect_count=1)
+    result = dbc.collection_count(expect_count=1)
     assert result == 1
-    result = db.cb_query(field="data", empty_retry=True)
+    result = dbc.cb_query(field="data", empty_retry=True)
     assert result == query_result
-    db.cb_upsert("test::2", document)
-    db.cb_subdoc_multi_upsert(["test::1", "test::2"], "data", ["new", "new"])
-    result = db.cb_get("test::1")
+    dbc.cb_upsert("test::2", document)
+    dbc.cb_subdoc_multi_upsert(["test::1", "test::2"], "data", ["new", "new"])
+    result = dbc.cb_get("test::1")
     assert result == new_document
-    result = db.collection_count(expect_count=2)
+    result = dbc.collection_count(expect_count=2)
     assert result == 2
-    db.cb_upsert("test::3", document)
-    db.cb_subdoc_upsert("test::3", "data", "new")
-    result = db.cb_get("test::3")
+    dbc.cb_upsert("test::3", document)
+    dbc.cb_subdoc_upsert("test::3", "data", "new")
+    result = dbc.cb_get("test::3")
     assert result == new_document
     print("=> Cleanup")
-    db.cb_drop_primary_index()
-    db.cb_drop_index(index_name)
-    db.delete_wait()
-    db.delete_wait(index_name)
-    db.drop_bucket(bucket)
+    dbm.cb_drop_primary_index()
+    dbm.cb_drop_index(index_name)
+    dbm.delete_wait()
+    dbm.delete_wait(index_name)
+    dbm.drop_bucket(bucket)
 
 
 p = Params()
 options = p.parameters
+
+try:
+    debug_level = int(os.environ['CB_PERF_DEBUG_LEVEL'])
+except (ValueError, KeyError):
+    debug_level = 3
+
+if debug_level == 0:
+    logger.setLevel(logging.DEBUG)
+elif debug_level == 1:
+    logger.setLevel(logging.ERROR)
+elif debug_level == 2:
+    logger.setLevel(logging.INFO)
+else:
+    logger.setLevel(logging.CRITICAL)
+
+logging.basicConfig()
 
 if options.start:
     container_start()
