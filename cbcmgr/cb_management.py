@@ -17,7 +17,7 @@ from couchbase.management.collections import CollectionSpec
 from couchbase.exceptions import (QueryIndexNotFoundException, QueryIndexAlreadyExistsException, BucketAlreadyExistsException, BucketNotFoundException, BucketDoesNotExistException,
                                   WatchQueryIndexTimeoutException, ScopeAlreadyExistsException, CollectionAlreadyExistsException, CollectionNotFoundException)
 from couchbase.management.queries import (CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions, DropPrimaryQueryIndexOptions, DropQueryIndexOptions)
-from couchbase.management.options import CreateBucketOptions, CreateScopeOptions, CreateCollectionOptions
+from couchbase.management.options import CreateBucketOptions, CreateScopeOptions, CreateCollectionOptions, GetAllQueryIndexOptions
 from couchbase.options import WaitUntilReadyOptions
 
 
@@ -188,6 +188,60 @@ class CBManager(CBConnect):
                     print(f"Index query ok: returned {len(result.rows())} records")
             except Exception as err:
                 print(f"query service not ready: {err}")
+
+    def cluster_schema_dump(self) -> dict:
+        inventory = {
+            "inventory": []
+        }
+        cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
+        bm = cluster.buckets()
+        qim = cluster.query_indexes()
+        buckets = bm.get_all_buckets()
+        for b in buckets:
+            schema = {
+                b.name: {
+                    "buckets": [
+                        {
+                            "name": b.name,
+                            "scopes": []
+                        }
+                    ]
+                }
+            }
+            self.logger.debug(f"scanning bucket {b.name}")
+            bucket = cluster.bucket(b.name)
+            cm = bucket.collections()
+            scopes = cm.get_all_scopes()
+            for s in scopes:
+                schema_scope = {
+                    "name": s.name,
+                    "collections": []
+                }
+                self.logger.debug(f"scanning scope {s.name}")
+                collections = s.collections
+                for c in collections:
+                    self.logger.debug(f"scanning collection {c.name}")
+                    primary_index = False
+                    index_get_options = GetAllQueryIndexOptions(scope_name=s.name, collection_name=c.name)
+                    indexes = qim.get_all_indexes(b.name, index_get_options)
+                    index_names = list(map(lambda i: i.name, [index for index in indexes]))
+                    index_keys_lists = list(map(lambda i: i.index_key, [index for index in indexes]))
+                    index_keys = [item.strip('`') for sublist in index_keys_lists for item in sublist]
+                    if '#primary' in index_names:
+                        primary_index = True
+                        index_names.remove('#primary')
+                    schema_collection = {
+                        "name": c.name,
+                        "schema": {},
+                        "idkey": "",
+                        "primary_index": primary_index,
+                        "override_count": False,
+                        "indexes": index_keys
+                    }
+                    schema_scope['collections'].append(schema_collection)
+                schema[b.name]["buckets"][0]["scopes"].append(schema_scope)
+            inventory["inventory"].append(schema)
+        return inventory
 
     def index_name(self, fields: list[str]):
         hash_string = ','.join(fields)
