@@ -1,18 +1,15 @@
 ##
 ##
 
-from .exceptions import (DNSLookupTimeout, NodeUnreachable, NodeConnectionTimeout, NodeConnectionError,
-                         NodeConnectionFailed, ClusterKVServiceError, ClusterHealthCheckError, ClusterQueryServiceError,
-                         ClusterViewServiceError)
+from .exceptions import (DNSLookupTimeout, NodeUnreachable, NodeConnectionTimeout, NodeConnectionError, NodeConnectionFailed, ClusterHealthCheckError)
 from .retry import retry
 from .httpsessionmgr import APISession
 import logging
 import socket
 import dns.resolver
-import sys
 from datetime import timedelta
 from couchbase.auth import PasswordAuthenticator
-from couchbase.options import ClusterTimeoutOptions, QueryOptions, ClusterOptions, LockMode
+from couchbase.options import ClusterTimeoutOptions, ClusterOptions, LockMode
 from couchbase.cluster import Cluster
 from couchbase.diagnostics import ServiceType, PingState
 
@@ -188,99 +185,6 @@ class CBSession(object):
         node_set = set(nodes)
         self.logger.debug("ping complete")
         return list(node_set)
-
-    @retry(factor=0.5)
-    def wait_for_query_ready(self):
-        query_str = r"SELECT 1 FROM system:dual;"
-        cluster = Cluster(self.cb_connect_string, ClusterOptions(self.auth,
-                                                                 timeout_options=self.timeouts,
-                                                                 lockmode=LockMode.WAIT))
-        result = cluster.query(query_str, QueryOptions(metrics=False, adhoc=True))
-        value = result.rows()[0].get('$1')
-        if value == 1:
-            return True
-        else:
-            return False
-
-    @retry(factor=0.5)
-    def wait_for_index_ready(self):
-        query_str = r"SELECT * FROM system:indexes;"
-        cluster = Cluster(self.cb_connect_string, ClusterOptions(self.auth,
-                                                                 timeout_options=self.timeouts,
-                                                                 lockmode=LockMode.WAIT))
-        result = cluster.query(query_str, QueryOptions(metrics=False, adhoc=True))
-        value = result.rows()
-        if len(value) >= 0:
-            return True
-        else:
-            return False
-
-    @retry()
-    def cluster_health_check(self, output=False, restrict=True, noraise=False, extended=False):
-        try:
-            cluster = Cluster(self.cb_connect_string, ClusterOptions(self.auth,
-                                                                     timeout_options=self.timeouts,
-                                                                     lockmode=LockMode.WAIT))
-            result = cluster.ping()
-        except Exception as err:
-            raise ClusterHealthCheckError("cluster unhealthy: {}".format(err))
-
-        endpoint: ServiceType
-        for endpoint, reports in result.endpoints.items():
-            for report in reports:
-                if restrict and endpoint != ServiceType.KeyValue:
-                    continue
-                report_string = " {0}: {1} took {2} {3}".format(
-                    endpoint.value,
-                    report.remote,
-                    report.latency,
-                    report.state.value)
-                if output:
-                    print(report_string)
-                    continue
-                if not report.state == PingState.OK:
-                    if noraise:
-                        print(f"{endpoint.value} service not ok: {report.state}")
-                        sys.exit(2)
-                    else:
-                        if endpoint == ServiceType.KeyValue:
-                            raise ClusterKVServiceError("{} KV service not ok".format(self.cb_connect_string))
-                        elif endpoint == ServiceType.Query:
-                            raise ClusterQueryServiceError("{} query service not ok".format(self.cb_connect_string))
-                        elif endpoint == ServiceType.View:
-                            raise ClusterViewServiceError("{} view service not ok".format(self.cb_connect_string))
-                        else:
-                            raise ClusterHealthCheckError(
-                                "{} service {} not ok".format(self.cb_connect_string, endpoint.value))
-
-        if output:
-            print("Cluster Diagnostics:")
-            diag_result = cluster.diagnostics()
-            for endpoint, reports in diag_result.endpoints.items():
-                for report in reports:
-                    report_string = " {0}: {1} last activity {2} {3}".format(
-                        endpoint.value,
-                        report.remote,
-                        report.last_activity,
-                        report.state.value)
-                    print(report_string)
-
-        if extended:
-            try:
-                if 'n1ql' in self.cluster_services:
-                    query = "select * from system:datastores ;"
-                    result = cluster.query(query, QueryOptions(metrics=False, adhoc=True))
-                    print(f"Datastore query ok: returned {len(result.rows())} records")
-                if 'index' in self.cluster_services:
-                    query = "select * from system:indexes ;"
-                    result = cluster.query(query, QueryOptions(metrics=False, adhoc=True))
-                    print(f"Index query ok: returned {len(result.rows())} records")
-            except Exception as err:
-                if noraise:
-                    print(f"query service not ready: {err}")
-                    sys.exit(3)
-                else:
-                    raise ClusterQueryServiceError(f"query service test error: {err}")
 
     def print_host_map(self):
         if self.rally_dns_domain:

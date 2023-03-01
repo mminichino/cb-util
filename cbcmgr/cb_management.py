@@ -1,7 +1,7 @@
 ##
 ##
 
-from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError)
+from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError)
 from .retry import retry, retry_inline
 from .cb_connect import CBConnect
 from datetime import timedelta
@@ -9,12 +9,16 @@ import attr
 import hashlib
 from attr.validators import instance_of as io, optional
 from typing import Protocol, Iterable
+from couchbase.cluster import Cluster
+from couchbase.options import QueryOptions
+from couchbase.diagnostics import ServiceType, PingState
 from couchbase.management.buckets import CreateBucketSettings, BucketType, StorageBackend
 from couchbase.management.collections import CollectionSpec
-from couchbase.exceptions import (QueryIndexNotFoundException, QueryIndexAlreadyExistsException, BucketAlreadyExistsException, BucketNotFoundException,
+from couchbase.exceptions import (QueryIndexNotFoundException, QueryIndexAlreadyExistsException, BucketAlreadyExistsException, BucketNotFoundException, BucketDoesNotExistException,
                                   WatchQueryIndexTimeoutException, ScopeAlreadyExistsException, CollectionAlreadyExistsException, CollectionNotFoundException)
 from couchbase.management.queries import (CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions, DropPrimaryQueryIndexOptions, DropQueryIndexOptions)
 from couchbase.management.options import CreateBucketOptions, CreateScopeOptions, CreateCollectionOptions
+from couchbase.options import WaitUntilReadyOptions
 
 
 @attr.s
@@ -66,13 +70,12 @@ class CBManager(CBConnect):
             pass
         self.bucket(name)
 
-    @retry()
     def drop_bucket(self, name):
         self.logger.debug(f"drop_bucket: drop bucket {name}")
         try:
             bm = self._cluster.buckets()
             bm.drop_bucket(name)
-        except BucketNotFoundException:
+        except (BucketNotFoundException, BucketDoesNotExistException):
             pass
 
     def create_scope(self, name):
@@ -120,6 +123,71 @@ class CBManager(CBConnect):
             cm.drop_collection(collection_spec)
         except CollectionNotFoundException:
             pass
+
+    def wait_for_query_ready(self):
+        cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
+        cluster.wait_until_ready(timedelta(seconds=30), WaitUntilReadyOptions(service_types=[ServiceType.Query, ServiceType.Management]))
+
+    @retry(factor=0.5)
+    def wait_for_index_ready(self):
+        value = []
+        query_str = r"SELECT * FROM system:indexes;"
+        cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
+        result = cluster.query(query_str, QueryOptions(metrics=False, adhoc=True))
+        for item in result:
+            value.append(item)
+        if len(value) >= 0:
+            return True
+        else:
+            return False
+
+    def cluster_health_check(self, output=False, restrict=True, extended=False):
+        try:
+            cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
+            result = cluster.ping()
+        except Exception as err:
+            raise ClusterHealthCheckError("cluster unhealthy: {}".format(err))
+
+        endpoint: ServiceType
+        for endpoint, reports in result.endpoints.items():
+            for report in reports:
+                if restrict and endpoint != ServiceType.KeyValue:
+                    continue
+                report_string = " {0}: {1} took {2} {3}".format(
+                    endpoint.value,
+                    report.remote,
+                    report.latency,
+                    report.state.value)
+                if output:
+                    print(report_string)
+                    continue
+                if not report.state == PingState.OK:
+                    print(f"{endpoint.value} service not ok: {report.state}")
+
+        if output:
+            print("Cluster Diagnostics:")
+            diag_result = cluster.diagnostics()
+            for endpoint, reports in diag_result.endpoints.items():
+                for report in reports:
+                    report_string = " {0}: {1} last activity {2} {3}".format(
+                        endpoint.value,
+                        report.remote,
+                        report.last_activity,
+                        report.state.value)
+                    print(report_string)
+
+        if extended:
+            try:
+                if 'n1ql' in self.cluster_services:
+                    query = "select * from system:datastores ;"
+                    result = cluster.query(query, QueryOptions(metrics=False, adhoc=True))
+                    print(f"Datastore query ok: returned {len(result.rows())} records")
+                if 'index' in self.cluster_services:
+                    query = "select * from system:indexes ;"
+                    result = cluster.query(query, QueryOptions(metrics=False, adhoc=True))
+                    print(f"Index query ok: returned {len(result.rows())} records")
+            except Exception as err:
+                print(f"query service not ready: {err}")
 
     def index_name(self, fields: list[str]):
         hash_string = ','.join(fields)
