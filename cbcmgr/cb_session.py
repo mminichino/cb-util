@@ -115,6 +115,10 @@ class CBSession(object):
         except Exception:
             raise
 
+        if self.rally_dns_domain:
+            self.rally_cluster_node = self.rally_host_name = self.srv_host_list[0]['hostname']
+            self.logger.debug(f"Rewriting rally node as {self.rally_cluster_node}")
+
         try:
             self.check_node_connectivity(self.rally_cluster_node, self.admin_port)
         except (NodeConnectionTimeout, NodeConnectionError, NodeConnectionFailed) as err:
