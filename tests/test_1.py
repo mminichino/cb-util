@@ -51,6 +51,8 @@ def test_cb_driver_1(hostname, bucket, tls, scope, collection):
     dbc.cb_upsert("test::1", document)
     dbc.bucket_wait(bucket, count=1)
 
+    result = dbc.has_primary_index()
+    assert result is True
     result = dbc.cb_get("test::1")
     assert result == document
     result = dbc.collection_count(expect_count=1)
@@ -67,6 +69,9 @@ def test_cb_driver_1(hostname, bucket, tls, scope, collection):
     dbc.cb_subdoc_upsert("test::3", "data", "new")
     result = dbc.cb_get("test::3")
     assert result == new_document
+
+    inventory = dbm.cluster_schema_dump()
+    assert type(inventory) is dict
 
     dbm.cb_drop_primary_index()
     dbm.cb_drop_index(index_name)

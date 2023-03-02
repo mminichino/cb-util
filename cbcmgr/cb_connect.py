@@ -13,6 +13,8 @@ from couchbase.cluster import Cluster
 import couchbase.subdocument as SD
 from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundException, DocumentNotFoundException, DocumentExistsException, QueryIndexAlreadyExistsException)
 from couchbase.options import (QueryOptions, LockMode, ClusterOptions, TLSVerifyMode, WaitUntilReadyOptions)
+from couchbase.management.options import GetAllQueryIndexOptions
+from couchbase.management.queries import CreatePrimaryQueryIndexOptions, DropPrimaryQueryIndexOptions
 from couchbase.diagnostics import ServiceType
 
 JSONType = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
@@ -102,6 +104,33 @@ class CBConnect(CBSession):
         except Exception as err:
             raise BucketWaitException(f"bucket_wait: error: {err}")
 
+    def has_primary_index(self, create: bool = False, replica: int = 0, timeout: int = 480):
+        qim = self._cluster.query_indexes()
+        index_get_options = GetAllQueryIndexOptions(scope_name=self._scope_name, collection_name=self._collection_name)
+        indexes = qim.get_all_indexes(self._bucket.name, index_get_options)
+        index_names = list(map(lambda i: i.name, [index for index in indexes]))
+        if '#primary' in index_names:
+            return True
+        else:
+            if create:
+                index_options = CreatePrimaryQueryIndexOptions(deferred=False, timeout=timedelta(seconds=timeout), num_replicas=replica,
+                                                               collection_name=self._collection.name, scope_name=self._scope.name)
+                try:
+                    qim.create_primary_index(self._bucket.name, index_options)
+                except QueryIndexAlreadyExistsException:
+                    pass
+                return True
+            else:
+                return False
+
+    def revert_primary_index(self, timeout: int = 480):
+        qim = self._cluster.query_indexes()
+        try:
+            index_options = DropPrimaryQueryIndexOptions(timeout=timedelta(seconds=timeout), collection_name=self._collection.name, scope_name=self._scope.name)
+            qim.drop_primary_index(self._bucket.name, index_options)
+        except QueryIndexNotFoundException:
+            pass
+
     @retry()
     def cb_get(self, key: Union[int, str]):
         try:
@@ -140,7 +169,7 @@ class CBConnect(CBSession):
             done, tasks = concurrent.futures.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)
             for task in done:
                 try:
-                    result = task.result()
+                    task.result()
                 except Exception as err:
                     raise CollectionSubdocUpsertError(f"multi upsert error: {err}")
 
