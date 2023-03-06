@@ -5,6 +5,7 @@ import docker
 def pytest_addoption(parser):
     parser.addoption("--host", action="store", default="localhost")
     parser.addoption("--bucket", action="store", default="test")
+    parser.addoption("--external", action="store_true")
 
 
 @pytest.fixture
@@ -22,6 +23,9 @@ def pytest_configure(config):
 
 
 def pytest_sessionstart(session):
+    external = session.config.getoption('--external')
+    if external:
+        return
     print("Starting test container")
     client = docker.from_env()
     container_id = client.containers.run('mminichino/cbdev:latest',
@@ -70,22 +74,13 @@ def pytest_sessionstart(session):
         print(line.decode("utf-8"))
     assert exit_code == 0
 
-    # print("Creating test bucket and loading data")
-    # exit_code, output = container_id.exec_run(['/demo/couchbase/cbperf/cb_perf',
-    #                                            'load',
-    #                                            '--host', '127.0.0.1',
-    #                                            '--count', '30',
-    #                                            '--schema', 'employee_demo',
-    #                                            '--replica', '0',
-    #                                            '--safe'])
-    #
-    # for line in output.split(b'\n'):
-    #     print(line.decode("utf-8"))
-    # assert exit_code == 0
     print("Ready.")
 
 
 def pytest_sessionfinish(session, exitstatus):
+    external = session.config.getoption('--external')
+    if external:
+        return
     print("")
     print("Stopping container")
     client = docker.from_env()

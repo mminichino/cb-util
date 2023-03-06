@@ -50,6 +50,7 @@ class Params(object):
         parser.add_argument('--bucket', action='store', help="Test Bucket", default="testrun")
         parser.add_argument('--start', action='store_true', help="Start Container")
         parser.add_argument('--stop', action='store_true', help="Stop Container")
+        parser.add_argument("--external", action="store_true")
         self.args = parser.parse_args()
 
     @property
