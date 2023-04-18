@@ -37,6 +37,8 @@ def test_cb_driver_1(hostname, bucket, tls, scope, collection):
     dbm.create_bucket(bucket)
     dbm.create_scope(scope)
     dbm.create_collection(collection)
+    result = dbm.get_bucket(bucket)
+    assert result is not None
 
     dbc = CBConnect(hostname, "Administrator", "password", ssl=False).connect(bucket, scope, collection)
 
@@ -50,6 +52,8 @@ def test_cb_driver_1(hostname, bucket, tls, scope, collection):
     assert result is True
     dbc.cb_upsert("test::1", document)
     dbc.bucket_wait(bucket, count=1)
+    result = dbc.cb_doc_exists("test::1")
+    assert result is True
 
     result = dbc.has_primary_index()
     assert result is True

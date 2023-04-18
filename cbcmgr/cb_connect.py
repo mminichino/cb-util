@@ -131,6 +131,13 @@ class CBConnect(CBSession):
         except QueryIndexNotFoundException:
             pass
 
+    def cb_doc_exists(self, doc_id: str):
+        result = self._collection.exists(doc_id)
+        if result.exists:
+            return True
+        else:
+            return False
+
     @retry()
     def cb_get(self, key: Union[int, str]):
         try:

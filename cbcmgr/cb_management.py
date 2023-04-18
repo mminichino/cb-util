@@ -8,11 +8,11 @@ from datetime import timedelta
 import attr
 import hashlib
 from attr.validators import instance_of as io, optional
-from typing import Protocol, Iterable
+from typing import Protocol, Iterable, Optional
 from couchbase.cluster import Cluster
 from couchbase.options import QueryOptions
 from couchbase.diagnostics import ServiceType, PingState
-from couchbase.management.buckets import CreateBucketSettings, BucketType, StorageBackend
+from couchbase.management.buckets import CreateBucketSettings, BucketType, StorageBackend, BucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.exceptions import (QueryIndexNotFoundException, QueryIndexAlreadyExistsException, BucketAlreadyExistsException, BucketNotFoundException, BucketDoesNotExistException,
                                   WatchQueryIndexTimeoutException, ScopeAlreadyExistsException, CollectionAlreadyExistsException, CollectionNotFoundException)
@@ -99,6 +99,13 @@ class CBManager(CBConnect):
         except CollectionAlreadyExistsException:
             pass
         self.collection(name)
+
+    def get_bucket(self, name: str) -> Optional[BucketSettings]:
+        try:
+            bm = self._cluster.buckets()
+            return bm.get_bucket(name)
+        except BucketDoesNotExistException:
+            return None
 
     @staticmethod
     def get_scope(cm, scope_name):
