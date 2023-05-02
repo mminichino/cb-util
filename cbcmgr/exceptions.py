@@ -300,3 +300,7 @@ class ScopeNotConnected(CBException):
 
 class CollectionNotConnected(CBException):
     pass
+
+
+class SchemaFileError(CBException):
+    pass
