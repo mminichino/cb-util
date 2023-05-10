@@ -1,7 +1,8 @@
-.PHONY:	push
+.PHONY:	setup push all
 
-push:
+setup:
 		python setup.py sdist
-		sleep 2
+push:
 		$(eval REV_FILE := $(shell ls dist/*.gz | tail -1))
 		twine upload $(REV_FILE)
+all: setup push

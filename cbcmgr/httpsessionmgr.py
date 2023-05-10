@@ -102,6 +102,7 @@ class APISession(object):
         warnings.filterwarnings("ignore")
         self.username = username
         self.password = password
+        self.timeout = 30
         self.logger = logging.getLogger(self.__class__.__name__)
         self.url_prefix = "http://127.0.0.1"
         self.session = requests.Session()
@@ -164,6 +165,9 @@ class APISession(object):
             port_num = port if port else 443
             self.url_prefix = f"https://{hostname}:{port_num}"
 
+    def set_timeout(self, timeout: int):
+        self.timeout = timeout
+
     def get_endpoint(self, path):
         return ':'.join(self.url_prefix.split(':')[:-1]) + path
 
@@ -219,7 +223,7 @@ class APISession(object):
     def api_get(self, endpoint, items=None):
         if items is None:
             items = []
-        response = self.session.get(self.url_prefix + endpoint, auth=self.auth_class, verify=False, timeout=15)
+        response = self.session.get(self.url_prefix + endpoint, auth=self.auth_class, verify=False, timeout=self.timeout)
 
         try:
             self.check_status_code(response.status_code)
@@ -245,7 +249,7 @@ class APISession(object):
                                      auth=self.auth_class,
                                      json=body,
                                      verify=False,
-                                     timeout=15)
+                                     timeout=self.timeout)
 
         try:
             self.check_status_code(response.status_code)
@@ -260,7 +264,7 @@ class APISession(object):
                                     auth=self.auth_class,
                                     json=body,
                                     verify=False,
-                                    timeout=15)
+                                    timeout=self.timeout)
 
         try:
             self.check_status_code(response.status_code)
@@ -277,7 +281,7 @@ class APISession(object):
                                     auth=self.auth_class,
                                     data=body,
                                     verify=False,
-                                    timeout=15,
+                                    timeout=self.timeout,
                                     headers=headers)
 
         try:
@@ -289,7 +293,7 @@ class APISession(object):
         return self
 
     def api_delete(self, endpoint):
-        response = self.session.delete(self.url_prefix + endpoint, auth=self.auth_class, verify=False, timeout=15)
+        response = self.session.delete(self.url_prefix + endpoint, auth=self.auth_class, verify=False, timeout=self.timeout)
 
         try:
             self.check_status_code(response.status_code)
