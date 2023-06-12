@@ -278,6 +278,10 @@ class HTTPNotImplemented(CBException):
     pass
 
 
+class PreconditionFailed(CBException):
+    pass
+
+
 class PaginationDataNotFound(CBException):
     pass
 
