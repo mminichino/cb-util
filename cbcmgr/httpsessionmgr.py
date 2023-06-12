@@ -14,7 +14,7 @@ import warnings
 from urllib.parse import urlparse
 from requests.auth import AuthBase
 from .exceptions import (NotAuthorized, HTTPForbidden, HTTPNotImplemented, RequestValidationError, InternalServerError,
-                         PaginationDataNotFound, SyncGatewayOperationException, PreconditionFailed)
+                         PaginationDataNotFound, SyncGatewayOperationException, PreconditionFailed, ConflictException)
 
 
 class CapellaToken(object):
@@ -147,6 +147,8 @@ class APISession(object):
             raise HTTPForbidden("API: Forbidden: Insufficient privileges")
         elif code == 404:
             raise HTTPNotImplemented("API: Not Found")
+        elif code == 409:
+            raise ConflictException("Conflict")
         elif code == 412:
             raise PreconditionFailed("Precondition Failed")
         elif code == 415:

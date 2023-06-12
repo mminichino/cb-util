@@ -282,6 +282,10 @@ class PreconditionFailed(CBException):
     pass
 
 
+class ConflictException(CBException):
+    pass
+
+
 class PaginationDataNotFound(CBException):
     pass
 
