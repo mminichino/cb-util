@@ -28,6 +28,7 @@ class CBSession(object):
         self._bucket = None
         self._scope = None
         self._collection = None
+        self._bucket_name = None
         self._scope_name = "_default"
         self._collection_name = "_default"
         self.username = username

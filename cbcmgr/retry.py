@@ -7,9 +7,11 @@ import logging
 from typing import Callable
 from functools import wraps
 
+logger = logging.getLogger('cbutil.retry')
+logger.addHandler(logging.NullHandler())
+
 
 def retry_inline(func, *args, retry_count=10, factor=0.01, **kwargs):
-    logger = logging.getLogger(retry_inline.__name__)
     for retry_number in range(retry_count + 1):
         try:
             return func(*args, **kwargs)
@@ -28,7 +30,6 @@ def retry(retry_count=10,
           allow_list=None,
           always_raise_list=None
           ) -> Callable:
-    logger = logging.getLogger(retry.__name__)
 
     def retry_handler(func):
         if not asyncio.iscoroutinefunction(func):

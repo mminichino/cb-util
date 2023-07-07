@@ -53,6 +53,7 @@ class CBConnect(CBSession):
         logger.debug(f"bucket: connecting bucket {name}")
         if self._cluster:
             self._bucket = retry_inline(self._cluster.bucket, name)
+            self._bucket_name = name
         else:
             raise ClusterNotConnected("no cluster connected")
 

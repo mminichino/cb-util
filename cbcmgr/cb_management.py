@@ -498,6 +498,38 @@ class CBManager(CBConnect):
             except Exception as err:
                 raise PathMapUpsertError(f"cb_map_upsert: error {err}")
 
+    @retry()
+    def _cb_upsert(self, cluster, c_name, meta_id, doc_data, timeout=5):
+        upsert_options = UpsertOptions(timeout=timedelta(seconds=timeout))
+        try:
+            logger.debug(f"upsert -> {c_name}: {meta_id}")
+            bucket = cluster.bucket(self._bucket_name)
+            collection = bucket.scope(self._scope_name).collection(c_name)
+            result = collection.upsert(meta_id, doc_data, upsert_options)
+            return result.cas
+        except Exception as error:
+            raise CollectionUpsertError(f"upsert error: {error}")
+
+    @retry()
+    def _create_collection(self, cluster, c_name):
+        bucket = cluster.bucket(self._bucket_name)
+        cm = bucket.collections()
+        try:
+            collection_spec = CollectionSpec(c_name, scope_name=self._scope_name)
+            cm.create_collection(collection_spec, CreateCollectionOptions(timeout=timedelta(seconds=10)))
+            self._verify_collection(cm, c_name)
+        except CollectionAlreadyExistsException:
+            pass
+        except Exception as error:
+            raise CollectionCreateException(f"collection create error: {error}")
+
+    @retry()
+    def _verify_collection(self, cm, c_name):
+        sm = next((s for s in cm.get_all_scopes() if s.name == self._scope_name), None)
+        valid = next((i for i in sm.collections if i.name == c_name), None)
+        if not valid:
+            raise CollectionCreateException(f"collection {c_name} was not created")
+
     def cb_map_upsert(self,
                       prefix: str,
                       config: UpsertMapConfig,
@@ -508,6 +540,7 @@ class CBManager(CBConnect):
                       timeout=5):
         tasks = set()
         executor = concurrent.futures.ThreadPoolExecutor()
+        cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
 
         if json_file:
             with open(json_file, mode="r") as json_xml:
@@ -523,31 +556,20 @@ class CBManager(CBConnect):
         else:
             raise PathMapUpsertError(f"cb_map_upsert: JSON or XML input data is required")
 
-        def _cb_upsert(collection, meta_id, doc_data):
-            try:
-                upsert_options = UpsertOptions(timeout=timedelta(seconds=timeout))
-                _collection = self._scope.collection(collection)
-                result = retry_inline(_collection.upsert, meta_id, doc_data, upsert_options)
-                logger.debug(f"upsert -> {collection}: {meta_id}: cas {result.cas}")
-                return result.cas
-            except Exception as error:
-                raise CollectionUpsertError(f"upsert error: {error}")
-
-        def _create_collection(c_name):
-            try:
-                collection_spec = CollectionSpec(c_name, scope_name=self._scope.name)
-                cm = self._bucket.collections()
-                cm.create_collection(collection_spec, CreateCollectionOptions(timeout=timedelta(seconds=10)))
-            except CollectionAlreadyExistsException:
-                pass
-            except Exception as error:
-                raise CollectionCreateException(f"collection create error: {error}")
-
         for c in config.paths:
             if c.collection:
                 logger.debug(f"cb_map_upsert: creating collection {c.name}")
-                retry_inline(_create_collection, c.name)
+                tasks.add(executor.submit(self._create_collection, cluster, c.name))
 
+        while tasks:
+            done, tasks = concurrent.futures.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)
+            for task in done:
+                try:
+                    task.result()
+                except Exception as err:
+                    raise PathMapUpsertError(f"cb_map_upsert: {err}")
+
+        tasks.clear()
         for c in config.paths:
             logger.debug(f"cb_map_upsert: processing key {c.path} name {c.name}")
 
@@ -571,14 +593,15 @@ class CBManager(CBConnect):
             if c.p_type == MapUpsertType.DOCUMENT:
                 doc_id = self.key_format(c.id, subset, text=prefix)
                 logger.debug(f"cb_map_upsert: processing doc ID {doc_id}")
-                tasks.add(executor.submit(_cb_upsert, collection_name, doc_id, {c.name: subset}))
+                doc = {c.name: subset}
+                tasks.add(executor.submit(self._cb_upsert, cluster, collection_name, doc_id, doc, timeout))
             elif c.p_type == MapUpsertType.LIST:
                 logger.debug(f"cb_map_upsert: processing list")
                 if not isinstance(subset, list):
                     raise PathMapUpsertError(f"cb_map_upsert: path {c.path} type {type(subset)} incompatible with list mode")
                 for doc in subset:
                     doc_id = self.key_format(c.id, doc, text=prefix, id_key=c.id_key)
-                    tasks.add(executor.submit(_cb_upsert, collection_name, doc_id, doc))
+                    tasks.add(executor.submit(self._cb_upsert, cluster, collection_name, doc_id, doc, timeout))
 
         while tasks:
             done, tasks = concurrent.futures.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)

@@ -132,6 +132,7 @@ class Params(object):
         parser.add_argument('--start', action='store_true', help="Start Container")
         parser.add_argument('--stop', action='store_true', help="Stop Container")
         parser.add_argument("--external", action="store_true")
+        parser.add_argument("--file", action="store", help="Input File")
         self.args = parser.parse_args()
 
     @property
@@ -234,6 +235,29 @@ def manual_3(hostname, bucket, tls, scope, collection):
     dbm.drop_bucket(bucket)
 
 
+def manual_4(hostname, bucket, tls, scope, collection, file):
+    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
+    dbm.create_bucket(bucket)
+    dbm.create_scope(scope)
+    dbm.create_collection(collection)
+
+    print(f"=> Map Test File {file}")
+    cfg = UpsertMapConfig().new()
+    cfg.add('root.addresses.billing', collection=True)
+    cfg.add('root.addresses.delivery', collection=True)
+    cfg.add('root.history.events',
+            p_type=MapUpsertType.LIST,
+            collection=True,
+            doc_id=KeyStyle.TEXT_FIELD,
+            id_key="event_id")
+
+    base = os.path.basename(file)
+    prefix = os.path.splitext(base)[0]
+    print(f"=> Doc ID Prefix {prefix}")
+
+    dbm.cb_map_upsert(prefix, cfg, xml_file=file)
+
+
 p = Params()
 options = p.parameters
 
@@ -259,6 +283,10 @@ if options.start:
 
 if options.stop:
     container_stop()
+    sys.exit(0)
+
+if options.file:
+    manual_4(options.host, "import", options.ssl, "_default", "_default", options.file)
     sys.exit(0)
 
 manual_1(options.host, "test", options.ssl, "test", "test")
