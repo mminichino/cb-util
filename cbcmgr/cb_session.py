@@ -1,24 +1,29 @@
 ##
 ##
 
-from .exceptions import (DNSLookupTimeout, NodeUnreachable, NodeConnectionTimeout, NodeConnectionError, NodeConnectionFailed, ClusterHealthCheckError)
+from .exceptions import (DNSLookupTimeout, NodeUnreachable, NodeConnectionTimeout, NodeConnectionError, NodeConnectionFailed, ClusterHealthCheckError, KeyFormatError)
 from .retry import retry
 from .httpsessionmgr import APISession
+from .config import KeyStyle
 import logging
 import socket
 import dns.resolver
+import uuid
+from typing import Union
 from datetime import timedelta
 from couchbase.auth import PasswordAuthenticator
 from couchbase.options import ClusterTimeoutOptions, ClusterOptions, LockMode
 from couchbase.cluster import Cluster
 from couchbase.diagnostics import ServiceType, PingState
 
+logger = logging.getLogger('cbutil.session')
+logger.addHandler(logging.NullHandler())
+
 
 class CBSession(object):
 
     def __init__(self, hostname: str, username: str, password: str, ssl=False, external=False):
         self.cluster_node_count = None
-        self.logger = logging.getLogger(self.__class__.__name__)
         self._cluster = None
         self._bucket = None
         self._scope = None
@@ -89,7 +94,7 @@ class CBSession(object):
     @property
     def cb_connect_string(self):
         connect_string = self.cb_prefix + self.rally_host_name
-        self.logger.debug(f"Connect string: {connect_string}")
+        logger.debug(f"Connect string: {connect_string}")
         return connect_string
 
     @retry(retry_count=5)
@@ -98,7 +103,7 @@ class CBSession(object):
         resolver.timeout = 5
         resolver.lifetime = 10
 
-        self.logger.debug(f"checking if rally node is reachable: {self.rally_host_name}")
+        logger.debug(f"checking if rally node is reachable: {self.rally_host_name}")
         try:
             answer = resolver.resolve(self.srv_prefix + self.rally_host_name, "SRV")
             for srv in answer:
@@ -117,7 +122,7 @@ class CBSession(object):
 
         if self.rally_dns_domain:
             self.rally_cluster_node = self.rally_host_name = self.srv_host_list[0]['hostname']
-            self.logger.debug(f"Rewriting rally node as {self.rally_cluster_node}")
+            logger.debug(f"Rewriting rally node as {self.rally_cluster_node}")
 
         try:
             self.check_node_connectivity(self.rally_cluster_node, self.admin_port)
@@ -136,7 +141,7 @@ class CBSession(object):
         rally_ip = socket.gethostbyname(self.rally_host_name)
 
         if not self.cluster_info:
-            self.logger.debug("process_cluster_data: no cluster info")
+            logger.debug("process_cluster_data: no cluster info")
             return
 
         self.cluster_node_count = range(len(self.cluster_info['nodes']))
@@ -150,7 +155,7 @@ class CBSession(object):
                 self.external_list.append(alternate_address)
                 external_ip = socket.gethostbyname(alternate_address)
                 if rally_ip == external_ip:
-                    self.logger.debug(f"external address {rally_ip} detected")
+                    logger.debug(f"external address {rally_ip} detected")
                     self.use_external_network = True
 
     @retry(retry_count=5)
@@ -176,7 +181,7 @@ class CBSession(object):
         cluster = Cluster(self.cb_connect_string, ClusterOptions(self.auth,
                                                                  timeout_options=self.timeouts,
                                                                  lockmode=LockMode.WAIT))
-        self.logger.debug(f"cluster {self.cb_connect_string} ping")
+        logger.debug(f"cluster {self.cb_connect_string} ping")
         ping_result = cluster.ping()
         endpoint: ServiceType
         for endpoint, reports in ping_result.endpoints.items():
@@ -187,7 +192,7 @@ class CBSession(object):
                     raise ClusterHealthCheckError(f"service {endpoint.value} not ok")
 
         node_set = set(nodes)
-        self.logger.debug("ping complete")
+        logger.debug("ping complete")
         return list(node_set)
 
     def print_host_map(self):
@@ -215,3 +220,50 @@ class CBSession(object):
                 for key in ext_port_list:
                     print("%s:%s" % (key, ext_port_list[key]), end=' ')
             print("[Services] %s [version] %s [platform] %s" % (services, version, ostype))
+
+    def key_format(self,
+                   style: KeyStyle,
+                   document: dict,
+                   doc_num: int = 1,
+                   id_key: str = "record_id",
+                   separator: str = "::",
+                   text: Union[str, None] = None,
+                   path: Union[str, None] = None,
+                   field: Union[str, None] = None):
+        if style.value == 0:
+            return f"{self.keyspace}{separator}{doc_num}"
+        elif style.value == 1:
+            if not document.get('type'):
+                raise KeyFormatError(f"Key style type requested: document does not have type field")
+            if document.get(id_key):
+                number = document.get(id_key)
+            else:
+                number = doc_num
+            return f"{document['type']}{separator}{number}"
+        elif style.value == 2:
+            return uuid.uuid4()
+        elif style.value == 3:
+            if not field:
+                raise KeyFormatError(f"Key field name style requested: field parameter is null")
+            return f"{field}{separator}{doc_num}"
+        elif style.value == 4:
+            return f"{self.keyspace}{separator}{doc_num}"
+        elif style.value == 5:
+            if not field:
+                raise KeyFormatError(f"Key compound name style requested: field parameter is null")
+            return f"{self.keyspace}{separator}{field}{separator}{doc_num}"
+        elif style.value == 6:
+            if not path or not text:
+                raise KeyFormatError(f"Key path style parameters not provided")
+            return f"{text}{separator}{path}"
+        elif style.value == 7:
+            if not text:
+                raise KeyFormatError(f"Key text style parameter not provided")
+            return f"{text}"
+        elif style.value == 8:
+            if not text:
+                raise KeyFormatError(f"Key text style parameter not provided")
+            number = document.get(id_key, 1)
+            return f"{text}{separator}{id_key}{separator}{number}"
+        else:
+            raise KeyFormatError(f"Unknown key style {style.name}")

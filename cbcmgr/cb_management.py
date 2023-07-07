@@ -1,14 +1,17 @@
 ##
 ##
 
-from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError)
+from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError, PathMapUpsertError)
 from .retry import retry, retry_inline
 from .cb_connect import CBConnect
+from .util import r_getattr, omit_path
+from .config import UpsertMapConfig, MapUpsertType
 from datetime import timedelta
 import attr
 import hashlib
+import logging
 from attr.validators import instance_of as io, optional
-from typing import Protocol, Iterable, Optional
+from typing import Protocol, Iterable, Optional, Any
 from couchbase.cluster import Cluster
 from couchbase.options import QueryOptions
 from couchbase.diagnostics import ServiceType, PingState
@@ -19,6 +22,9 @@ from couchbase.exceptions import (QueryIndexNotFoundException, QueryIndexAlready
 from couchbase.management.queries import (CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions, DropPrimaryQueryIndexOptions, DropQueryIndexOptions)
 from couchbase.management.options import CreateBucketOptions, CreateScopeOptions, CreateCollectionOptions, GetAllQueryIndexOptions
 from couchbase.options import WaitUntilReadyOptions
+
+logger = logging.getLogger('cbutil.manager')
+logger.addHandler(logging.NullHandler())
 
 
 @attr.s
@@ -57,7 +63,7 @@ class CBManager(CBConnect):
         super().__init__(*args, **kwargs)
 
     def create_bucket(self, name, quota: int = 256, replicas: int = 0):
-        self.logger.debug(f"create_bucket: create bucket {name}")
+        logger.debug(f"create_bucket: create bucket {name}")
         try:
             bm = self._cluster.buckets()
             bm.create_bucket(CreateBucketSettings(name=name,
@@ -71,7 +77,7 @@ class CBManager(CBConnect):
         self.bucket(name)
 
     def drop_bucket(self, name):
-        self.logger.debug(f"drop_bucket: drop bucket {name}")
+        logger.debug(f"drop_bucket: drop bucket {name}")
         try:
             bm = self._cluster.buckets()
             bm.drop_bucket(name)
@@ -79,7 +85,7 @@ class CBManager(CBConnect):
             pass
 
     def create_scope(self, name):
-        self.logger.debug(f"create_scope: create scope {name}")
+        logger.debug(f"create_scope: create scope {name}")
         try:
             if name != "_default":
                 cm = self._bucket.collections()
@@ -89,7 +95,7 @@ class CBManager(CBConnect):
         self.scope(name)
 
     def create_collection(self, name):
-        self.logger.debug(f"create_collection: create collection {name}")
+        logger.debug(f"create_collection: create collection {name}")
         try:
             if name != "_default":
                 collection_spec = CollectionSpec(name, scope_name=self._scope.name)
@@ -123,7 +129,7 @@ class CBManager(CBConnect):
 
     @retry()
     def drop_collection(self, name):
-        self.logger.debug(f"drop_collection: drop collection {name}")
+        logger.debug(f"drop_collection: drop collection {name}")
         try:
             collection_spec = CollectionSpec(name, scope_name=self._scope.name)
             cm = self._bucket.collections()
@@ -215,7 +221,7 @@ class CBManager(CBConnect):
                     ]
                 }
             }
-            self.logger.debug(f"scanning bucket {b.name}")
+            logger.debug(f"scanning bucket {b.name}")
             bucket = cluster.bucket(b.name)
             cm = bucket.collections()
             scopes = cm.get_all_scopes()
@@ -224,10 +230,10 @@ class CBManager(CBConnect):
                     "name": s.name,
                     "collections": []
                 }
-                self.logger.debug(f"scanning scope {s.name}")
+                logger.debug(f"scanning scope {s.name}")
                 collections = s.collections
                 for c in collections:
-                    self.logger.debug(f"scanning collection {c.name}")
+                    logger.debug(f"scanning collection {c.name}")
                     primary_index = False
                     index_get_options = GetAllQueryIndexOptions(scope_name=s.name, collection_name=c.name)
                     indexes = qim.get_all_indexes(b.name, index_get_options)
@@ -273,7 +279,7 @@ class CBManager(CBConnect):
             index_options = CreatePrimaryQueryIndexOptions(deferred=False,
                                                            timeout=timedelta(seconds=timeout),
                                                            num_replicas=replica)
-        self.logger.debug(
+        logger.debug(
             f"cb_create_primary_index: creating primary index on {self._collection.name}")
         try:
             qim = self._cluster.query_indexes()
@@ -296,7 +302,7 @@ class CBManager(CBConnect):
         try:
             index_name = self.index_name(fields)
             qim = self._cluster.query_indexes()
-            self.logger.debug(
+            logger.debug(
                 f"creating index {index_name} on {','.join(fields)} for {self.keyspace}")
             qim.create_index(self._bucket.name, index_name, fields, index_options)
             return index_name
@@ -311,7 +317,7 @@ class CBManager(CBConnect):
                                                          scope_name=self._scope.name)
         else:
             index_options = DropPrimaryQueryIndexOptions(timeout=timedelta(seconds=timeout))
-        self.logger.debug(f"cb_drop_primary_index: dropping primary index on {self.collection_name}")
+        logger.debug(f"cb_drop_primary_index: dropping primary index on {self.collection_name}")
         try:
             qim = self._cluster.query_indexes()
             qim.drop_primary_index(self._bucket.name, index_options)
@@ -327,7 +333,7 @@ class CBManager(CBConnect):
         else:
             index_options = DropQueryIndexOptions(timeout=timedelta(seconds=timeout))
         try:
-            self.logger.debug(f"cb_drop_index: drop index {name}")
+            logger.debug(f"cb_drop_index: drop index {name}")
             qim = self._cluster.query_indexes()
             qim.drop_index(self._bucket.name, name, index_options)
         except QueryIndexNotFoundException:
@@ -436,3 +442,45 @@ class CBManager(CBConnect):
     def delete_wait(self, index_name: str = None):
         if self.is_index(index_name=index_name):
             raise IndexNotReady(f"delete_wait: index still exists")
+
+    def cb_map_upsert(self, prefix: str, config: UpsertMapConfig, attr_obj: Any):
+        primitive = (int, str, bool, list, dict)
+        value = None
+        for c in config.paths:
+            logger.debug(f"cb_map_upsert: processing key {c.path} name {c.name}")
+            try:
+                subset = r_getattr(attr_obj, c.path)
+                if isinstance(subset, list):
+                    if not any(isinstance(item, primitive) for item in subset):
+                        value = []
+                        for item in subset:
+                            value.append(item.as_dict)
+                elif isinstance(subset, primitive) or not subset:
+                    value = subset
+                else:
+                    value = subset.as_dict
+
+                if c.collection:
+                    self.create_collection(c.name)
+
+                if c.exclude:
+                    logger.debug(f"cb_map_upsert: excluding {','.join(c.exclude)}")
+                    value = omit_path(value, c.exclude)
+
+                if c.p_type == MapUpsertType.DOCUMENT:
+                    doc_id = self.key_format(c.id, value, text=prefix)
+                    logger.debug(f"cb_map_upsert: processing doc ID {doc_id}")
+                    self._collection.upsert(doc_id, {c.name: value})
+                elif c.p_type == MapUpsertType.LIST:
+                    logger.debug(f"cb_map_upsert: processing list")
+                    if not isinstance(value, list):
+                        raise PathMapUpsertError(f"cb_map_upsert: path {c.path} type {type(value)} incompatible with list mode")
+                    for doc in value:
+                        doc_id = self.key_format(c.id, doc, text=prefix, id_key=c.id_key)
+                        self._collection.upsert(doc_id, doc)
+
+            except AttributeError:
+                raise PathMapUpsertError(f"cb_map_upsert: key {c.path} not found")
+
+            except Exception as err:
+                raise PathMapUpsertError(f"cb_map_upsert: error {err}")

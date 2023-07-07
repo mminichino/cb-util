@@ -8,15 +8,19 @@ from .cb_session import CBSession
 from .httpsessionmgr import APISession
 from datetime import timedelta
 from typing import Union, Dict, Any, List
+import logging
 import concurrent.futures
 from couchbase.cluster import Cluster
 import couchbase.subdocument as SD
-from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundException, DocumentNotFoundException, DocumentExistsException, QueryIndexAlreadyExistsException)
+from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundException, DocumentNotFoundException, DocumentExistsException, QueryIndexAlreadyExistsException,
+                                  PathNotFoundException)
 from couchbase.options import (QueryOptions, LockMode, ClusterOptions, TLSVerifyMode, WaitUntilReadyOptions)
 from couchbase.management.options import GetAllQueryIndexOptions
 from couchbase.management.queries import CreatePrimaryQueryIndexOptions, DropPrimaryQueryIndexOptions
 from couchbase.diagnostics import ServiceType
 
+logger = logging.getLogger('cbutil.connect')
+logger.addHandler(logging.NullHandler())
 JSONType = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
 
 
@@ -36,7 +40,7 @@ class CBConnect(CBSession):
             self.cluster_options.update(network="default")
 
     def connect(self, bucket: str = None, scope: str = "_default", collection: str = "_default"):
-        self.logger.debug(f"connect: connect string {self.cb_connect_string}")
+        logger.debug(f"connect: connect string {self.cb_connect_string}")
         self._cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
         self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue, ServiceType.Management]))
         if bucket:
@@ -46,7 +50,7 @@ class CBConnect(CBSession):
         return self
 
     def bucket(self, name: str):
-        self.logger.debug(f"bucket: connecting bucket {name}")
+        logger.debug(f"bucket: connecting bucket {name}")
         if self._cluster:
             self._bucket = retry_inline(self._cluster.bucket, name)
         else:
@@ -54,7 +58,7 @@ class CBConnect(CBSession):
 
     def scope(self, name: str = "_default"):
         if self._bucket:
-            self.logger.debug(f"scope: connecting scope {name}")
+            logger.debug(f"scope: connecting scope {name}")
             self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
             self._scope = self._bucket.scope(name)
             self._scope_name = name
@@ -63,7 +67,7 @@ class CBConnect(CBSession):
 
     def collection(self, name: str = "_default"):
         if self._scope:
-            self.logger.debug(f"collection: connecting collection {name}")
+            logger.debug(f"collection: connecting collection {name}")
             self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
             self._collection = self._scope.collection(name)
             self._collection_name = name
@@ -143,7 +147,7 @@ class CBConnect(CBSession):
         try:
             document_id = self.construct_key(key)
             result = self._collection.get(document_id)
-            self.logger.debug(f"cb_get: {document_id}: cas {result.cas}")
+            logger.debug(f"cb_get: {document_id}: cas {result.cas}")
             return result.content_as[dict]
         except DocumentNotFoundException:
             return None
@@ -151,10 +155,10 @@ class CBConnect(CBSession):
     @retry()
     def cb_upsert(self, key: Union[int, str], document: JSONType):
         try:
-            self.logger.debug(f"cb_upsert: key {key}")
+            logger.debug(f"cb_upsert: key {key}")
             document_id = self.construct_key(key)
             result = self._collection.upsert(document_id, document)
-            self.logger.debug(f"cb_upsert: {document_id}: cas {result.cas}")
+            logger.debug(f"cb_upsert: {document_id}: cas {result.cas}")
             return result
         except DocumentExistsException:
             return None
@@ -163,8 +167,33 @@ class CBConnect(CBSession):
     def cb_subdoc_upsert(self, key: Union[int, str], field: str, value: JSONType):
         document_id = self.construct_key(key)
         result = self._collection.mutate_in(document_id, [SD.upsert(field, value)])
-        self.logger.debug(f"cb_subdoc_upsert: {document_id}: cas {result.cas}")
+        logger.debug(f"cb_subdoc_upsert: {document_id}: cas {result.cas}")
         return result.content_as[dict]
+
+    def cb_path_upsert(self, doc_id: str, path: str, data: JSONType):
+        root = False
+        path_v = path.split('.')
+        if len(path_v[0]) == 0:
+            root = True
+
+        while True:
+            try:
+                if root:
+                    self._collection.upsert(doc_id, data)
+                else:
+                    self._collection.mutate_in(doc_id, (SD.upsert(path, data),))
+                break
+            except DocumentNotFoundException:
+                self._collection.upsert(doc_id, {})
+            except PathNotFoundException:
+                for n in range(len(path_v)):
+                    p_path = '.'.join(path_v[:n + 1])
+                    r = self._collection.lookup_in(doc_id, (SD.exists(p_path),))
+                    if not r.exists(0):
+                        self._collection.mutate_in(doc_id, (SD.upsert(p_path, {}),))
+            except Exception as err:
+                print(f"Error: {err}")
+                break
 
     @retry()
     def cb_subdoc_multi_upsert(self, key_list: list, field: str, value_list: list):
@@ -198,7 +227,7 @@ class CBConnect(CBSession):
         contents = []
         try:
             self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.Query]))
-            self.logger.debug(f"cb_query: running query: {query}")
+            logger.debug(f"cb_query: running query: {query}")
             result = self._cluster.query(query, QueryOptions(metrics=False, adhoc=True))
             for item in result:
                 contents.append(item)

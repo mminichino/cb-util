@@ -312,3 +312,11 @@ class CollectionNotConnected(CBException):
 
 class SchemaFileError(CBException):
     pass
+
+
+class KeyFormatError(CBException):
+    pass
+
+
+class PathMapUpsertError(CBException):
+    pass
