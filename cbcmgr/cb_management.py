@@ -525,7 +525,7 @@ class CBManager(CBConnect):
             try:
                 upsert_options = UpsertOptions(timeout=timedelta(seconds=timeout))
                 _collection = self._scope.collection(collection)
-                result = _collection.upsert(meta_id, doc_data, upsert_options)
+                result = retry_inline(_collection.upsert, meta_id, doc_data, upsert_options)
                 logger.debug(f"upsert -> {collection}: {meta_id}: cas {result.cas}")
                 return result.cas
             except Exception as error:
