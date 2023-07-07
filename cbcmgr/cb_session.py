@@ -49,11 +49,11 @@ class CBSession(object):
         self.cluster_services = []
         self.auth = PasswordAuthenticator(self.username, self.password)
         self.timeouts = ClusterTimeoutOptions(query_timeout=timedelta(seconds=60),
-                                              kv_timeout=timedelta(seconds=4),
-                                              bootstrap_timeout=timedelta(seconds=4),
-                                              resolve_timeout=timedelta(seconds=4),
-                                              connect_timeout=timedelta(seconds=4),
-                                              management_timeout=timedelta(seconds=4))
+                                              kv_timeout=timedelta(seconds=5),
+                                              bootstrap_timeout=timedelta(seconds=5),
+                                              resolve_timeout=timedelta(seconds=5),
+                                              connect_timeout=timedelta(seconds=5),
+                                              management_timeout=timedelta(seconds=5))
 
         if self.ssl:
             self.prefix = "https://"

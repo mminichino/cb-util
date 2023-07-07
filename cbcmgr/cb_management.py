@@ -25,7 +25,7 @@ from couchbase.exceptions import (QueryIndexNotFoundException, QueryIndexAlready
                                   WatchQueryIndexTimeoutException, ScopeAlreadyExistsException, CollectionAlreadyExistsException, CollectionNotFoundException)
 from couchbase.management.queries import (CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions, DropPrimaryQueryIndexOptions, DropQueryIndexOptions)
 from couchbase.management.options import CreateBucketOptions, CreateScopeOptions, CreateCollectionOptions, GetAllQueryIndexOptions
-from couchbase.options import WaitUntilReadyOptions
+from couchbase.options import WaitUntilReadyOptions, UpsertOptions
 
 logger = logging.getLogger('cbutil.manager')
 logger.addHandler(logging.NullHandler())
@@ -111,6 +111,7 @@ class CBManager(CBConnect):
                 collection_spec = CollectionSpec(name, scope_name=self._scope.name)
                 cm = self._bucket.collections()
                 cm.create_collection(collection_spec, CreateCollectionOptions(timeout=timedelta(seconds=25)))
+                self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
                 retry_inline(self.get_collection, cm, name)
         except CollectionAlreadyExistsException:
             pass
@@ -501,7 +502,8 @@ class CBManager(CBConnect):
                       json_file: str = None,
                       xml_file: str = None,
                       json_data: str = None,
-                      xml_data: str = None):
+                      xml_data: str = None,
+                      timeout=10):
         tasks = set()
         executor = concurrent.futures.ThreadPoolExecutor()
 
@@ -521,8 +523,9 @@ class CBManager(CBConnect):
 
         def _cb_upsert(collection, meta_id, doc_data):
             try:
+                upsert_options = UpsertOptions(timeout=timedelta(seconds=timeout))
                 _collection = self._scope.collection(collection)
-                result = _collection.upsert(meta_id, doc_data)
+                result = _collection.upsert(meta_id, doc_data, upsert_options)
                 logger.debug(f"upsert -> {collection}: {meta_id}: cas {result.cas}")
                 return result.cas
             except Exception as error:
