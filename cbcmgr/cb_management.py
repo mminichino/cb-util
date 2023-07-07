@@ -69,6 +69,7 @@ class CBManager(CBConnect):
     def create_bucket(self, name, quota: int = 256, replicas: int = 0):
         if not name:
             raise BucketCreateException(f"bucket name can not be null")
+        self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
         logger.debug(f"create_bucket: create bucket {name}")
         try:
             bm = self._cluster.buckets()
@@ -93,6 +94,7 @@ class CBManager(CBConnect):
     def create_scope(self, name):
         if not name:
             raise ScopeCreateException(f"scope name can not be null")
+        self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
         logger.debug(f"create_scope: create scope {name}")
         try:
             if name != "_default":
@@ -105,13 +107,13 @@ class CBManager(CBConnect):
     def create_collection(self, name):
         if not name:
             raise CollectionCreateException(f"collection name can not be null")
+        self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
         logger.debug(f"create_collection: create collection {name}")
         try:
             if name != "_default":
                 collection_spec = CollectionSpec(name, scope_name=self._scope.name)
                 cm = self._bucket.collections()
                 cm.create_collection(collection_spec, CreateCollectionOptions(timeout=timedelta(seconds=25)))
-                self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
                 retry_inline(self.get_collection, cm, name)
         except CollectionAlreadyExistsException:
             pass
@@ -503,7 +505,7 @@ class CBManager(CBConnect):
                       xml_file: str = None,
                       json_data: str = None,
                       xml_data: str = None,
-                      timeout=10):
+                      timeout=5):
         tasks = set()
         executor = concurrent.futures.ThreadPoolExecutor()
 
@@ -531,6 +533,21 @@ class CBManager(CBConnect):
             except Exception as error:
                 raise CollectionUpsertError(f"upsert error: {error}")
 
+        def _create_collection(c_name):
+            try:
+                collection_spec = CollectionSpec(c_name, scope_name=self._scope.name)
+                cm = self._bucket.collections()
+                cm.create_collection(collection_spec, CreateCollectionOptions(timeout=timedelta(seconds=10)))
+            except CollectionAlreadyExistsException:
+                pass
+            except Exception as error:
+                raise CollectionCreateException(f"collection create error: {error}")
+
+        for c in config.paths:
+            if c.collection:
+                logger.debug(f"cb_map_upsert: creating collection {c.name}")
+                retry_inline(_create_collection, c.name)
+
         for c in config.paths:
             logger.debug(f"cb_map_upsert: processing key {c.path} name {c.name}")
 
@@ -544,7 +561,6 @@ class CBManager(CBConnect):
 
             if c.collection:
                 collection_name = c.name
-                self.create_collection(collection_name)
             else:
                 collection_name = self._collection.name
 
