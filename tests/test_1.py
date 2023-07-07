@@ -2,8 +2,10 @@
 
 import warnings
 import pytest
+import json
 from cbcmgr.cb_connect import CBConnect
 from cbcmgr.cb_management import CBManager
+from cbcmgr.config import UpsertMapConfig, MapUpsertType, KeyStyle
 
 
 warnings.filterwarnings("ignore")
@@ -26,6 +28,85 @@ query_result = [
         'data': 'data'
     }
 ]
+
+json_data = {
+            "name": "John Doe",
+            "email": "jdoe@example.com",
+            "addresses": {
+                "billing": {
+                    "line1": "123 Any Street",
+                    "line2": "Anywhere",
+                    "country": "United States"
+                },
+                "delivery": {
+                    "line1": "123 Any Street",
+                    "line2": "Anywhere",
+                    "country": "United States"
+                }
+            },
+            "history": {
+                "events": [
+                    {
+                        "event_id": "1",
+                        "date": "1/1/1970",
+                        "type": "contact"
+                    },
+                    {
+                        "event_id": "2",
+                        "date": "1/1/1970",
+                        "type": "contact"
+                    }
+                ]
+            },
+            "purchases": {
+                "complete": [
+                    339, 976, 442, 777
+                ],
+                "abandoned": [
+                    157, 42, 999
+                ]
+            }
+        }
+
+xml_data = """<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+  <name>John Doe</name>
+  <email>jdoe@example.com</email>
+  <addresses>
+    <billing>
+      <line1>123 Any Street</line1>
+      <line2>Anywhere</line2>
+      <country>United States</country>
+    </billing>
+    <delivery>
+      <line1>123 Any Street</line1>
+      <line2>Anywhere</line2>
+      <country>United States</country>
+    </delivery>
+  </addresses>
+  <history>
+    <events>
+      <event_id>1</event_id>
+      <date>1/1/1970</date>
+      <type>contact</type>
+    </events>
+    <events>
+      <event_id>2</event_id>
+      <date>1/1/1970</date>
+      <type>contact</type>
+    </events>
+  </history>
+  <purchases>
+    <complete>339</complete>
+    <complete>976</complete>
+    <complete>442</complete>
+    <complete>777</complete>
+    <abandoned>157</abandoned>
+    <abandoned>42</abandoned>
+    <abandoned>999</abandoned>
+  </purchases>
+</root>
+"""
 
 
 @pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
@@ -82,3 +163,43 @@ def test_cb_driver_1(hostname, bucket, tls, scope, collection):
     dbm.delete_wait()
     dbm.delete_wait(index_name)
     dbm.drop_bucket(bucket)
+
+
+@pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
+@pytest.mark.parametrize("tls", [False, True])
+def test_cb_driver_2(hostname, bucket, tls, scope, collection):
+    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
+    dbm.create_bucket(bucket)
+    dbm.create_scope(scope)
+    dbm.create_collection(collection)
+
+    cfg = UpsertMapConfig().new()
+    cfg.add('addresses.billing', collection=True)
+    cfg.add('addresses.delivery', collection=True)
+    cfg.add('history.events',
+            p_type=MapUpsertType.LIST,
+            collection=True,
+            doc_id=KeyStyle.TEXT_FIELD,
+            id_key="event_id")
+
+    dbm.cb_map_upsert("testdata", cfg, json_data=json.dumps(json_data, indent=2))
+
+
+@pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
+@pytest.mark.parametrize("tls", [False, True])
+def test_cb_driver_3(hostname, bucket, tls, scope, collection):
+    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
+    dbm.create_bucket(bucket)
+    dbm.create_scope(scope)
+    dbm.create_collection(collection)
+
+    cfg = UpsertMapConfig().new()
+    cfg.add('root.addresses.billing', collection=True)
+    cfg.add('root.addresses.delivery', collection=True)
+    cfg.add('root.history.events',
+            p_type=MapUpsertType.LIST,
+            collection=True,
+            doc_id=KeyStyle.TEXT_FIELD,
+            id_key="event_id")
+
+    dbm.cb_map_upsert("testdata", cfg, xml_data=xml_data)

@@ -5,6 +5,7 @@ import sys
 import argparse
 import os
 import logging
+import json
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -13,6 +14,7 @@ sys.path.append(current)
 
 from cbcmgr.cb_connect import CBConnect
 from cbcmgr.cb_management import CBManager
+from cbcmgr.config import UpsertMapConfig, MapUpsertType, KeyStyle
 from conftest import pytest_sessionstart, pytest_sessionfinish
 
 logger = logging.getLogger()
@@ -37,6 +39,85 @@ query_result = [
         'data': 'data'
     }
 ]
+
+json_data = {
+            "name": "John Doe",
+            "email": "jdoe@example.com",
+            "addresses": {
+                "billing": {
+                    "line1": "123 Any Street",
+                    "line2": "Anywhere",
+                    "country": "United States"
+                },
+                "delivery": {
+                    "line1": "123 Any Street",
+                    "line2": "Anywhere",
+                    "country": "United States"
+                }
+            },
+            "history": {
+                "events": [
+                    {
+                        "event_id": "1",
+                        "date": "1/1/1970",
+                        "type": "contact"
+                    },
+                    {
+                        "event_id": "2",
+                        "date": "1/1/1970",
+                        "type": "contact"
+                    }
+                ]
+            },
+            "purchases": {
+                "complete": [
+                    339, 976, 442, 777
+                ],
+                "abandoned": [
+                    157, 42, 999
+                ]
+            }
+        }
+
+xml_data = """<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+  <name>John Doe</name>
+  <email>jdoe@example.com</email>
+  <addresses>
+    <billing>
+      <line1>123 Any Street</line1>
+      <line2>Anywhere</line2>
+      <country>United States</country>
+    </billing>
+    <delivery>
+      <line1>123 Any Street</line1>
+      <line2>Anywhere</line2>
+      <country>United States</country>
+    </delivery>
+  </addresses>
+  <history>
+    <events>
+      <event_id>1</event_id>
+      <date>1/1/1970</date>
+      <type>contact</type>
+    </events>
+    <events>
+      <event_id>2</event_id>
+      <date>1/1/1970</date>
+      <type>contact</type>
+    </events>
+  </history>
+  <purchases>
+    <complete>339</complete>
+    <complete>976</complete>
+    <complete>442</complete>
+    <complete>777</complete>
+    <abandoned>157</abandoned>
+    <abandoned>42</abandoned>
+    <abandoned>999</abandoned>
+  </purchases>
+</root>
+"""
 
 
 class Params(object):
@@ -71,7 +152,7 @@ def manual_1(hostname, bucket, tls, scope, collection):
 
     print("=> Connect")
     dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
-    dbm.create_bucket(bucket)
+    dbm.create_bucket(bucket, quota=100)
     dbm.create_scope(scope)
     dbm.create_collection(collection)
     dbc = CBConnect(hostname, "Administrator", "password", ssl=False).connect(bucket, scope, collection)
@@ -111,6 +192,48 @@ def manual_1(hostname, bucket, tls, scope, collection):
     dbm.drop_bucket(bucket)
 
 
+def manual_2(hostname, bucket, tls, scope, collection):
+    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
+    dbm.create_bucket(bucket, quota=100)
+    dbm.create_scope(scope)
+    dbm.create_collection(collection)
+
+    print("=> Map Test JSON")
+    cfg = UpsertMapConfig().new()
+    cfg.add('addresses.billing', collection=True)
+    cfg.add('addresses.delivery', collection=True)
+    cfg.add('history.events',
+            p_type=MapUpsertType.LIST,
+            collection=True,
+            doc_id=KeyStyle.TEXT_FIELD,
+            id_key="event_id")
+
+    dbm.cb_map_upsert("testdata", cfg, json_data=json.dumps(json_data, indent=2))
+    print("=> Cleanup")
+    dbm.drop_bucket(bucket)
+
+
+def manual_3(hostname, bucket, tls, scope, collection):
+    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
+    dbm.create_bucket(bucket, quota=100)
+    dbm.create_scope(scope)
+    dbm.create_collection(collection)
+
+    print("=> Map Test XML")
+    cfg = UpsertMapConfig().new()
+    cfg.add('root.addresses.billing', collection=True)
+    cfg.add('root.addresses.delivery', collection=True)
+    cfg.add('root.history.events',
+            p_type=MapUpsertType.LIST,
+            collection=True,
+            doc_id=KeyStyle.TEXT_FIELD,
+            id_key="event_id")
+
+    dbm.cb_map_upsert("testdata", cfg, xml_data=xml_data)
+    print("=> Cleanup")
+    dbm.drop_bucket(bucket)
+
+
 p = Params()
 options = p.parameters
 
@@ -139,3 +262,5 @@ if options.stop:
     sys.exit(0)
 
 manual_1(options.host, "test", options.ssl, "test", "test")
+manual_2(options.host, "testa", options.ssl, "test", "test")
+manual_3(options.host, "testb", options.ssl, "test", "test")

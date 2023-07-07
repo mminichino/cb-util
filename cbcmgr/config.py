@@ -28,6 +28,12 @@ class MapUpsertType(Enum):
 class UpsertMapConfig:
     paths: List[UpsertMapPathConfig] = attr.ib(default=[])
 
+    @classmethod
+    def new(cls):
+        return cls(
+            []
+        )
+
     def add(self,
             path: str,
             p_type: MapUpsertType = MapUpsertType.DOCUMENT,

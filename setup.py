@@ -6,7 +6,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='cbcmgr',
-    version='1.3.0',
+    version='1.3.1',
     packages=['cbcmgr'],
     url='https://github.com/mminichino/cb-util',
     license='MIT License',
@@ -19,7 +19,8 @@ setup(
         'docker',
         'pytest',
         'requests',
-        'urllib3'
+        'urllib3',
+        'xmltodict'
     ],
     author_email='info@unix.us.com',
     description='Couchbase connection manager',

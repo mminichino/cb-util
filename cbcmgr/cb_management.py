@@ -1,15 +1,18 @@
 ##
 ##
 
-from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError, PathMapUpsertError)
+from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError, PathMapUpsertError, CollectionUpsertError)
 from .retry import retry, retry_inline
 from .cb_connect import CBConnect
-from .util import r_getattr, omit_path
+from .util import r_getattr, omit_path, copy_path
 from .config import UpsertMapConfig, MapUpsertType
 from datetime import timedelta
 import attr
 import hashlib
 import logging
+import json
+import xmltodict
+import concurrent.futures
 from attr.validators import instance_of as io, optional
 from typing import Protocol, Iterable, Optional, Any
 from couchbase.cluster import Cluster
@@ -443,7 +446,7 @@ class CBManager(CBConnect):
         if self.is_index(index_name=index_name):
             raise IndexNotReady(f"delete_wait: index still exists")
 
-    def cb_map_upsert(self, prefix: str, config: UpsertMapConfig, attr_obj: Any):
+    def cb_map_upsert_attr(self, prefix: str, config: UpsertMapConfig, attr_obj: Any):
         primitive = (int, str, bool, list, dict)
         value = None
         for c in config.paths:
@@ -484,3 +487,70 @@ class CBManager(CBConnect):
 
             except Exception as err:
                 raise PathMapUpsertError(f"cb_map_upsert: error {err}")
+
+    def cb_map_upsert(self,
+                      prefix: str,
+                      config: UpsertMapConfig,
+                      json_file: str = None,
+                      xml_file: str = None,
+                      json_data: str = None,
+                      xml_data: str = None):
+        tasks = set()
+        executor = concurrent.futures.ThreadPoolExecutor()
+
+        if json_file:
+            with open(json_file, mode="r") as json_xml:
+                data = json.load(json_xml)
+        elif xml_file:
+            with open(xml_file, mode="rb") as input_xml:
+                contents = input_xml.read()
+                data = xmltodict.parse(contents)
+        elif json_data:
+            data = json.loads(json_data)
+        elif xml_data:
+            data = xmltodict.parse(xml_data)
+        else:
+            raise PathMapUpsertError(f"cb_map_upsert: JSON or XML input data is required")
+
+        def _cb_upsert(meta_id, doc_data):
+            try:
+                result = self._collection.upsert(meta_id, doc_data)
+                logger.debug(f"cb_upsert: {meta_id}: cas {result.cas}")
+                return result.cas
+            except Exception as error:
+                raise CollectionUpsertError(f"upsert error: {error}")
+
+        for c in config.paths:
+            logger.debug(f"cb_map_upsert: processing key {c.path} name {c.name}")
+
+            subset = copy_path(c.path, data)
+
+            if not subset or len(subset) == 0:
+                raise PathMapUpsertError(f"path {c.path} not found in source data")
+
+            if c.collection:
+                self.create_collection(c.name)
+
+            if c.exclude:
+                logger.debug(f"cb_map_upsert: excluding {','.join(c.exclude)}")
+                subset = omit_path(subset, c.exclude)
+
+            if c.p_type == MapUpsertType.DOCUMENT:
+                doc_id = self.key_format(c.id, subset, text=prefix)
+                logger.debug(f"cb_map_upsert: processing doc ID {doc_id}")
+                tasks.add(executor.submit(_cb_upsert, doc_id, {c.name: subset}))
+            elif c.p_type == MapUpsertType.LIST:
+                logger.debug(f"cb_map_upsert: processing list")
+                if not isinstance(subset, list):
+                    raise PathMapUpsertError(f"cb_map_upsert: path {c.path} type {type(subset)} incompatible with list mode")
+                for doc in subset:
+                    doc_id = self.key_format(c.id, doc, text=prefix, id_key=c.id_key)
+                    tasks.add(executor.submit(_cb_upsert, doc_id, doc))
+
+        while tasks:
+            done, tasks = concurrent.futures.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)
+            for task in done:
+                try:
+                    task.result()
+                except Exception as err:
+                    raise PathMapUpsertError(f"cb_map_upsert: {err}")
