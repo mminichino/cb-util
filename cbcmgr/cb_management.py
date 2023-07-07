@@ -1,7 +1,8 @@
 ##
 ##
 
-from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError, PathMapUpsertError, CollectionUpsertError)
+from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError, PathMapUpsertError, CollectionUpsertError,
+                         ScopeCreateException, BucketCreateException, CollectionCreateException)
 from .retry import retry, retry_inline
 from .cb_connect import CBConnect
 from .util import r_getattr, omit_path, copy_path
@@ -66,6 +67,8 @@ class CBManager(CBConnect):
         super().__init__(*args, **kwargs)
 
     def create_bucket(self, name, quota: int = 256, replicas: int = 0):
+        if not name:
+            raise BucketCreateException(f"bucket name can not be null")
         logger.debug(f"create_bucket: create bucket {name}")
         try:
             bm = self._cluster.buckets()
@@ -88,6 +91,8 @@ class CBManager(CBConnect):
             pass
 
     def create_scope(self, name):
+        if not name:
+            raise ScopeCreateException(f"scope name can not be null")
         logger.debug(f"create_scope: create scope {name}")
         try:
             if name != "_default":
@@ -98,6 +103,8 @@ class CBManager(CBConnect):
         self.scope(name)
 
     def create_collection(self, name):
+        if not name:
+            raise CollectionCreateException(f"collection name can not be null")
         logger.debug(f"create_collection: create collection {name}")
         try:
             if name != "_default":
