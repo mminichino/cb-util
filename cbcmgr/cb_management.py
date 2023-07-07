@@ -519,10 +519,11 @@ class CBManager(CBConnect):
         else:
             raise PathMapUpsertError(f"cb_map_upsert: JSON or XML input data is required")
 
-        def _cb_upsert(meta_id, doc_data):
+        def _cb_upsert(collection, meta_id, doc_data):
             try:
-                result = self._collection.upsert(meta_id, doc_data)
-                logger.debug(f"cb_upsert: {meta_id}: cas {result.cas}")
+                _collection = self._scope.collection(collection)
+                result = _collection.upsert(meta_id, doc_data)
+                logger.debug(f"upsert -> {collection}: {meta_id}: cas {result.cas}")
                 return result.cas
             except Exception as error:
                 raise CollectionUpsertError(f"upsert error: {error}")
@@ -533,10 +534,16 @@ class CBManager(CBConnect):
             subset = copy_path(c.path, data)
 
             if not subset or len(subset) == 0:
-                raise PathMapUpsertError(f"path {c.path} not found in source data")
+                if c.optional:
+                    continue
+                else:
+                    raise PathMapUpsertError(f"path {c.path} not found in source data")
 
             if c.collection:
-                self.create_collection(c.name)
+                collection_name = c.name
+                self.create_collection(collection_name)
+            else:
+                collection_name = self._collection.name
 
             if c.exclude:
                 logger.debug(f"cb_map_upsert: excluding {','.join(c.exclude)}")
@@ -545,14 +552,14 @@ class CBManager(CBConnect):
             if c.p_type == MapUpsertType.DOCUMENT:
                 doc_id = self.key_format(c.id, subset, text=prefix)
                 logger.debug(f"cb_map_upsert: processing doc ID {doc_id}")
-                tasks.add(executor.submit(_cb_upsert, doc_id, {c.name: subset}))
+                tasks.add(executor.submit(_cb_upsert, collection_name, doc_id, {c.name: subset}))
             elif c.p_type == MapUpsertType.LIST:
                 logger.debug(f"cb_map_upsert: processing list")
                 if not isinstance(subset, list):
                     raise PathMapUpsertError(f"cb_map_upsert: path {c.path} type {type(subset)} incompatible with list mode")
                 for doc in subset:
                     doc_id = self.key_format(c.id, doc, text=prefix, id_key=c.id_key)
-                    tasks.add(executor.submit(_cb_upsert, doc_id, doc))
+                    tasks.add(executor.submit(_cb_upsert, collection_name, doc_id, doc))
 
         while tasks:
             done, tasks = concurrent.futures.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)

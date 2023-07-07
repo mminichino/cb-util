@@ -40,7 +40,8 @@ class UpsertMapConfig:
             collection: bool = False,
             exclude: list[str] = None,
             doc_id: KeyStyle = KeyStyle.TEXT,
-            id_key: str = "record_id"):
+            id_key: str = "record_id",
+            optional: bool = False):
         self.paths.append(
             UpsertMapPathConfig.create(
                 path,
@@ -48,7 +49,8 @@ class UpsertMapConfig:
                 collection,
                 exclude,
                 doc_id,
-                id_key
+                id_key,
+                optional
             )
         )
 
@@ -64,6 +66,7 @@ class UpsertMapPathConfig:
     exclude: list[str] = attr.ib(default=None)
     id: KeyStyle = attr.ib(default=KeyStyle.TEXT)
     id_key: str = attr.ib(default="record_id")
+    optional: bool = attr.ib(default=False)
 
     @classmethod
     def create(cls,
@@ -72,14 +75,16 @@ class UpsertMapPathConfig:
                collection: bool,
                exclude: list[str],
                doc_id: KeyStyle,
-               id_key: str):
+               id_key: str,
+               optional: bool):
         return cls(
             path,
             p_type,
             collection,
             exclude,
             doc_id,
-            id_key
+            id_key,
+            optional
         )
 
     @property
