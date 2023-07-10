@@ -1,6 +1,7 @@
 ##
 ##
 
+from __future__ import annotations
 from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError, PathMapUpsertError, CollectionUpsertError,
                          ScopeCreateException, BucketCreateException, CollectionCreateException)
 from .retry import retry, retry_inline
@@ -65,6 +66,10 @@ class CBManager(CBConnect):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def connect_cluster(self) -> CBManager:
+        self._cluster = self.session()
+        return self
 
     def create_bucket(self, name, quota: int = 256, replicas: int = 0):
         if not name:

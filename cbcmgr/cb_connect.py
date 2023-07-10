@@ -1,6 +1,7 @@
 ##
 ##
 
+from __future__ import annotations
 from .exceptions import (CollectionNameNotFound, IndexExistsError, QueryArgumentsError, QueryEmptyException, ClusterNotConnected, BucketNotConnected,
                          ScopeNotConnected, CollectionSubdocUpsertError, BucketWaitException, BucketStatsError, CollectionCountException, CollectionCountError)
 from .retry import retry, retry_inline
@@ -14,7 +15,7 @@ from couchbase.cluster import Cluster
 import couchbase.subdocument as SD
 from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundException, DocumentNotFoundException, DocumentExistsException, QueryIndexAlreadyExistsException,
                                   PathNotFoundException)
-from couchbase.options import (QueryOptions, LockMode, ClusterOptions, TLSVerifyMode, WaitUntilReadyOptions)
+from couchbase.options import (QueryOptions, WaitUntilReadyOptions)
 from couchbase.management.options import GetAllQueryIndexOptions
 from couchbase.management.queries import CreatePrimaryQueryIndexOptions, DropPrimaryQueryIndexOptions
 from couchbase.diagnostics import ServiceType
@@ -28,18 +29,8 @@ class CBConnect(CBSession):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.is_reachable()
-        self.check_cluster()
-        self.cluster_options = ClusterOptions(self.auth,
-                                              timeout_options=self.timeouts,
-                                              tls_verify=TLSVerifyMode.NO_VERIFY,
-                                              lockmode=LockMode.WAIT)
-        if self.use_external_network:
-            self.cluster_options.update(network="external")
-        else:
-            self.cluster_options.update(network="default")
 
-    def connect(self, bucket: str = None, scope: str = "_default", collection: str = "_default"):
+    def connect(self, bucket: str = None, scope: str = "_default", collection: str = "_default") -> CBConnect:
         logger.debug(f"connect: connect string {self.cb_connect_string}")
         self._cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
         self._cluster.wait_until_ready(timedelta(seconds=4), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue, ServiceType.Management]))
@@ -47,6 +38,10 @@ class CBConnect(CBSession):
             self.bucket(bucket)
             self.scope(scope)
             self.collection(collection)
+        return self
+
+    def connect_cluster(self) -> CBConnect:
+        self._cluster = self.session()
         return self
 
     def bucket(self, name: str):

@@ -6,6 +6,7 @@ import argparse
 import os
 import logging
 import json
+from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException)
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -14,6 +15,7 @@ sys.path.append(current)
 
 from cbcmgr.cb_connect import CBConnect
 from cbcmgr.cb_management import CBManager
+from cbcmgr.cb_operation_s import CBOperation
 from cbcmgr.config import UpsertMapConfig, MapUpsertType, KeyStyle
 from conftest import pytest_sessionstart, pytest_sessionfinish
 
@@ -132,6 +134,8 @@ class Params(object):
         parser.add_argument('--start', action='store_true', help="Start Container")
         parser.add_argument('--stop', action='store_true', help="Stop Container")
         parser.add_argument("--external", action="store_true")
+        parser.add_argument("--pool", action="store_true")
+        parser.add_argument("--verbose", action="store_true")
         parser.add_argument("--file", action="store", help="Input File")
         self.args = parser.parse_args()
 
@@ -258,15 +262,28 @@ def manual_4(hostname, bucket, tls, scope, collection, file):
     dbm.cb_map_upsert(prefix, cfg, xml_file=file)
 
 
+def manual_5(hostname, bucket, tls, scope, collection):
+    try:
+        op = CBOperation(hostname, "Administrator", "password", ssl=False).connect().bucket(bucket).scope(scope).collection(collection)
+    except (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException):
+        pass
+
+    op = CBOperation(hostname, "Administrator", "password", ssl=False, quota=128, create=True).connect().bucket(bucket).scope(scope).collection(collection)
+
+    op.put_doc("test::1", document)
+    d = op.get_doc("test::1")
+    assert d == document
+
+
 p = Params()
 options = p.parameters
 
 try:
-    debug_level = int(os.environ['CB_PERF_DEBUG_LEVEL'])
+    debug_level = int(os.environ['DEBUG_LEVEL'])
 except (ValueError, KeyError):
     debug_level = 3
 
-if debug_level == 0:
+if debug_level == 0 or options.verbose:
     logger.setLevel(logging.DEBUG)
 elif debug_level == 1:
     logger.setLevel(logging.ERROR)
@@ -287,6 +304,10 @@ if options.stop:
 
 if options.file:
     manual_4(options.host, "import", options.ssl, "_default", "_default", options.file)
+    sys.exit(0)
+
+if options.pool:
+    manual_5(options.host, "test", options.ssl, "test", "test")
     sys.exit(0)
 
 manual_1(options.host, "test", options.ssl, "test", "test")
