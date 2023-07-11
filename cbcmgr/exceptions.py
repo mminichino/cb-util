@@ -320,3 +320,7 @@ class KeyFormatError(CBException):
 
 class PathMapUpsertError(CBException):
     pass
+
+
+class TaskError(CBException):
+    pass

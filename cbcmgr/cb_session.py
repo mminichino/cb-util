@@ -41,11 +41,6 @@ class BucketMode(Enum):
 
 
 class CBSession(object):
-    HOSTNAME: str
-    USERNAME: str
-    PASSWORD: str
-    SSL: bool
-    EXTERNAL: bool
 
     def __init__(self, hostname: str, username: str, password: str, ssl=False, external=False, kv_timeout: int = 5, query_timeout: int = 60):
         self.cluster_node_count = None
@@ -97,38 +92,18 @@ class CBSession(object):
             self.admin_port = "8091"
             self.node_port = "9102"
 
+        self.is_reachable()
+        self.check_cluster()
+
         self.cluster_options = ClusterOptions(self.auth,
                                               timeout_options=self.timeouts,
                                               tls_verify=TLSVerifyMode.NO_VERIFY,
                                               lockmode=LockMode.WAIT)
+
         if self.use_external_network:
             self.cluster_options.update(network="external")
         else:
             self.cluster_options.update(network="default")
-
-        self.is_reachable()
-        self.check_cluster()
-
-        CBSession.HOSTNAME = self.hostname
-        CBSession.USERNAME = self.username
-        CBSession.PASSWORD = self.password
-        CBSession.SSL = self.ssl
-        CBSession.EXTERNAL = self.use_external_network
-
-    def get_hostname(self) -> str:
-        return self.hostname
-
-    def get_username(self) -> str:
-        return self.username
-
-    def get_password(self) -> str:
-        return self.password
-
-    def get_ssl(self) -> bool:
-        return self.ssl
-
-    def get_external(self) -> bool:
-        return self.use_external_network
 
     @retry()
     def session(self) -> Cluster:
@@ -139,161 +114,6 @@ class CBSession(object):
         cluster = await AsyncCluster.connect(self.cb_connect_string, self.cluster_options)
         await cluster.on_connect()
         return cluster
-
-    @retry(always_raise_list=(BucketNotFoundException,))
-    def get_bucket(self, cluster: Cluster, name: str) -> Bucket:
-        if name is None:
-            raise TypeError("name can not be None")
-        logger.debug(f"bucket: connect {name}")
-        return cluster.bucket(name)
-
-    @retry()
-    def _create_bucket(self, cluster: Cluster, name: str, quota: int = 256, replicas: int = 0, mode: BucketMode = BucketMode.DEFAULT):
-        if name is None:
-            raise TypeError("name can not be None")
-
-        logger.debug(f"creating bucket {name}")
-
-        if mode == BucketMode.DEFAULT:
-            b_type = BucketType.COUCHBASE
-            b_stor = StorageBackend.COUCHSTORE
-        elif mode == BucketMode.CACHE:
-            b_type = BucketType.EPHEMERAL
-            b_stor = StorageBackend.COUCHSTORE
-        else:
-            b_type = BucketType.COUCHBASE
-            b_stor = StorageBackend.MAGMA
-
-        try:
-            bm = cluster.buckets()
-            bm.create_bucket(CreateBucketSettings(name=name,
-                                                  bucket_type=b_type,
-                                                  storage_backend=b_stor,
-                                                  num_replicas=replicas,
-                                                  ram_quota_mb=quota))
-        except BucketAlreadyExistsException:
-            pass
-
-    @retry(always_raise_list=(BucketNotFoundException,))
-    async def get_bucket_a(self, cluster: AsyncCluster, name: str) -> AsyncBucket:
-        if name is None:
-            raise TypeError("name can not be None")
-        logger.debug(f"bucket: connect {name}")
-        bucket = cluster.bucket(name)
-        await bucket.on_connect()
-        return bucket
-
-    @retry(always_raise_list=(ScopeNotFoundException,))
-    def get_scope(self, bucket: Bucket, name: str = "_default") -> Scope:
-        if name is None:
-            raise TypeError("name can not be None")
-        logger.debug(f"scope: connect {name}")
-        if not self.is_scope(bucket, name):
-            raise ScopeNotFoundException(f"scope {name} does not exist")
-        return bucket.scope(name)
-
-    @retry()
-    def _create_scope(self, bucket: Bucket, name: str):
-        if name is None:
-            raise TypeError("name can not be None")
-
-        try:
-            if name != "_default":
-                cm = bucket.collections()
-                cm.create_scope(name)
-        except ScopeAlreadyExistsException:
-            pass
-
-    @retry(always_raise_list=(ScopeNotFoundException,))
-    async def get_scope_a(self, bucket: AsyncBucket, name: str = "_default") -> AsyncScope:
-        if name is None:
-            raise TypeError("name can not be None")
-        logger.debug(f"scope: connect {name}")
-        scope = bucket.scope(name)
-        return scope
-
-    @retry(always_raise_list=(CollectionNotFoundException,))
-    def get_collection(self, bucket: Bucket, scope: Scope, name: str = "_default") -> Collection:
-        if name is None:
-            raise TypeError("name can not be None")
-        logger.debug(f"collection: connect {name}")
-        if not self.is_collection(bucket, scope.name, name):
-            raise CollectionNotFoundException(f"collection {name} does not exist")
-        return scope.collection(name)
-
-    def _create_collection(self, bucket: Bucket, scope: Scope, name: str):
-        if name is None:
-            raise TypeError("name can not be None")
-
-        try:
-            if name != "_default":
-                collection_spec = CollectionSpec(name, scope_name=scope.name)
-                cm = bucket.collections()
-                cm.create_collection(collection_spec)
-        except CollectionAlreadyExistsException:
-            pass
-
-    @retry()
-    def _create_indexes(self, cluster: Cluster, bucket: Bucket, scope: Scope, collection: Collection, fields: list[str], replica: int = 0):
-        if collection.name != '_default':
-            index_options = CreateQueryIndexOptions(deferred=False,
-                                                    num_replicas=replica,
-                                                    collection_name=collection.name,
-                                                    scope_name=scope.name)
-        else:
-            index_options = CreateQueryIndexOptions(deferred=False,
-                                                    num_replicas=replica)
-        try:
-            qim = cluster.query_indexes()
-            for field in fields:
-                hash_string = f"{bucket.name}_{scope.name}_{collection.name}_{field}"
-                name_part = hashlib.shake_256(hash_string.encode()).hexdigest(3)
-                index_name = f"{field}_{name_part}_ix"
-                logger.debug(f"creating index {index_name} on {field} for {collection.name}")
-                qim.create_index(bucket.name, index_name, [field], index_options)
-        except QueryIndexAlreadyExistsException:
-            logger.debug(f"index already exists")
-            pass
-
-    @retry()
-    def _create_primary_index(self, cluster: Cluster, bucket: Bucket, scope: Scope, collection: Collection, replica: int = 0):
-        if collection.name != '_default':
-            index_options = CreatePrimaryQueryIndexOptions(deferred=False,
-                                                           num_replicas=replica,
-                                                           collection_name=collection.name,
-                                                           scope_name=scope.name)
-        else:
-            index_options = CreatePrimaryQueryIndexOptions(deferred=False,
-                                                           num_replicas=replica)
-        logger.debug(f"creating primary index on {collection.name}")
-        try:
-            qim = cluster.query_indexes()
-            qim.create_primary_index(bucket.name, index_options)
-        except QueryIndexAlreadyExistsException:
-            pass
-
-    @retry(always_raise_list=(CollectionNotFoundException,))
-    async def get_collection_a(self, scope: AsyncScope, name: str = "_default") -> AsyncCollection:
-        if name is None:
-            raise TypeError("name can not be None")
-        logger.debug(f"collection: connect {name}")
-        collection = scope.collection(name)
-        return collection
-
-    @staticmethod
-    def is_scope(bucket: Bucket, name: str):
-        if name is None:
-            raise TypeError("name can not be None")
-        cm = bucket.collections()
-        return next((s for s in cm.get_all_scopes() if s.name == name), None)
-
-    @staticmethod
-    def is_collection(bucket: Bucket, scope: str, name: str):
-        if name is None or scope is None:
-            raise TypeError("name and scope can not be None")
-        cm = bucket.collections()
-        sm = next((s for s in cm.get_all_scopes() if s.name == scope), None)
-        return next((i for i in sm.collections if i.name == name), None)
 
     def construct_key(self, key):
         if type(key) == int or str(key).isdigit():

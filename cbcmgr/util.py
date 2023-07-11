@@ -3,6 +3,7 @@
 
 import functools
 import copy
+import multiprocessing
 
 
 def r_getattr(obj, path):
@@ -34,3 +35,31 @@ def copy_path(path: str, data: dict):
             return copy_path('.'.join(parts[1:]), data[parts[0]])
     elif len(parts) == 1:
         return {}
+
+
+class MPValue(object):
+
+    def __init__(self, i=0):
+        self.count = multiprocessing.Value('i', i)
+
+    def increment(self, i=1):
+        with self.count.get_lock():
+            self.count.value += i
+
+    def decrement(self, i=1):
+        with self.count.get_lock():
+            self.count.value -= i
+
+    def reset(self, i=0):
+        with self.count.get_lock():
+            self.count.value = i
+
+    @property
+    def next(self):
+        with self.count.get_lock():
+            self.count.value += 1
+        return self.count.value
+
+    @property
+    def value(self):
+        return self.count.value

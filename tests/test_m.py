@@ -6,6 +6,7 @@ import argparse
 import os
 import logging
 import json
+import string
 from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException)
 
 current = os.path.dirname(os.path.realpath(__file__))
@@ -15,8 +16,10 @@ sys.path.append(current)
 
 from cbcmgr.cb_connect import CBConnect
 from cbcmgr.cb_management import CBManager
-from cbcmgr.cb_operation_s import CBOperation
+from cbcmgr.cb_operation_s import CBOperation, Operation
+from cbcmgr.mt_pool import CBPool
 from cbcmgr.config import UpsertMapConfig, MapUpsertType, KeyStyle
+from cbcmgr.cb_pathmap import CBPathMap
 from conftest import pytest_sessionstart, pytest_sessionfinish
 
 logger = logging.getLogger()
@@ -135,6 +138,7 @@ class Params(object):
         parser.add_argument('--stop', action='store_true', help="Stop Container")
         parser.add_argument("--external", action="store_true")
         parser.add_argument("--pool", action="store_true")
+        parser.add_argument("--map", action="store_true")
         parser.add_argument("--verbose", action="store_true")
         parser.add_argument("--file", action="store", help="Input File")
         self.args = parser.parse_args()
@@ -198,45 +202,33 @@ def manual_1(hostname, bucket, tls, scope, collection):
 
 
 def manual_2(hostname, bucket, tls, scope, collection):
-    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
-    dbm.create_bucket(bucket, quota=100)
-    dbm.create_scope(scope)
-    dbm.create_collection(collection)
-
     print("=> Map Test JSON")
     cfg = UpsertMapConfig().new()
-    cfg.add('addresses.billing', collection=True)
-    cfg.add('addresses.delivery', collection=True)
+    cfg.add('addresses.billing')
+    cfg.add('addresses.delivery')
     cfg.add('history.events',
             p_type=MapUpsertType.LIST,
-            collection=True,
-            doc_id=KeyStyle.TEXT_FIELD,
             id_key="event_id")
 
-    dbm.cb_map_upsert("testdata", cfg, json_data=json.dumps(json_data, indent=2))
+    p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=False, quota=128)
+    p_map.load_data("testdata", json_data=json.dumps(json_data, indent=2))
     print("=> Cleanup")
-    dbm.drop_bucket(bucket)
+    CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 
 
 def manual_3(hostname, bucket, tls, scope, collection):
-    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
-    dbm.create_bucket(bucket, quota=100)
-    dbm.create_scope(scope)
-    dbm.create_collection(collection)
-
     print("=> Map Test XML")
     cfg = UpsertMapConfig().new()
-    cfg.add('root.addresses.billing', collection=True)
-    cfg.add('root.addresses.delivery', collection=True)
+    cfg.add('root.addresses.billing')
+    cfg.add('root.addresses.delivery')
     cfg.add('root.history.events',
             p_type=MapUpsertType.LIST,
-            collection=True,
-            doc_id=KeyStyle.TEXT_FIELD,
             id_key="event_id")
 
-    dbm.cb_map_upsert("testdata", cfg, xml_data=xml_data)
+    p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=False, quota=128)
+    p_map.load_data("testdata", xml_data=xml_data)
     print("=> Cleanup")
-    dbm.drop_bucket(bucket)
+    CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 
 
 def manual_4(hostname, bucket, tls, scope, collection, file):
@@ -265,17 +257,60 @@ def manual_4(hostname, bucket, tls, scope, collection, file):
 def manual_5(hostname, bucket, tls, scope, collection):
     keyspace = f"{bucket}.{scope}.{collection}"
     try:
+        print(f"=> Test Exception")
         opm = CBOperation(hostname, "Administrator", "password", ssl=False)
         col_a = opm.connect(keyspace)
     except (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException):
         pass
 
-    opm = CBOperation(hostname, "Administrator", "password", ssl=False, quota=128, create=True)
-    col_a = opm.connect(keyspace)
+    print(f"=> Test Operator Class")
+    col_a = CBOperation(hostname, "Administrator", "password", ssl=False, quota=128, create=True).connect(keyspace)
 
-    col_a.put_doc("test::1", document)
-    d = col_a.get_doc("test::1")
+    col_a.put_doc(col_a.collection, "test::1", document)
+    d = col_a.get_doc(col_a.collection, "test::1")
     assert d == document
+
+    col_a.index_by_query("select data from test.test.test")
+
+    r = col_a.run_query(col_a.cluster, "select data from test.test.test")
+    assert r[0]['data'] == 'data'
+
+    print(f"=> Test Cleanup")
+    col_a.cleanup()
+
+    print(f"=> Test Operators")
+    col_t = CBOperation(hostname, "Administrator", "password", ssl=False, quota=128, create=True).connect(keyspace)
+    a_read = col_t.get_operator(Operation.READ)
+    a_write = col_t.get_operator(Operation.WRITE)
+    a_query = col_t.get_operator(Operation.QUERY)
+
+    a_write.prep("test::1", document)
+    a_write.execute()
+    a_read.prep("test::1")
+    a_read.execute()
+    assert document == a_read.result["test::1"]
+
+    col_t.index_by_query("select data from test.test.test")
+    a_query.prep("select data from test.test.test")
+    a_query.execute()
+    assert a_query.result[0]['data'] == 'data'
+
+    print(f"=> Test Cleanup")
+    col_a.cleanup()
+
+
+def manual_6(hostname, bucket, tls, scope, collection):
+    print(f"=> Pool Test 1")
+    pool = CBPool(hostname, "Administrator", "password", ssl=False, quota=128, create=True)
+
+    for n in range(10):
+        c = string.ascii_lowercase[n:n + 1]
+        keyspace = f"{bucket}.{scope}.{collection}{c}"
+        pool.connect(keyspace)
+        for i in range(1000):
+            pool.dispatch(keyspace, Operation.WRITE, f"test::{i+1}", document)
+
+    pool.join()
 
 
 p = Params()
@@ -311,8 +346,12 @@ if options.file:
 
 if options.pool:
     manual_5(options.host, "test", options.ssl, "test", "test")
+    manual_6(options.host, "test", options.ssl, "test", "test")
+    sys.exit(0)
+
+if options.map:
+    manual_2(options.host, "test", options.ssl, "test", "test")
+    manual_3(options.host, "test", options.ssl, "test", "test")
     sys.exit(0)
 
 manual_1(options.host, "test", options.ssl, "test", "test")
-manual_2(options.host, "testa", options.ssl, "test", "test")
-manual_3(options.host, "testb", options.ssl, "test", "test")
