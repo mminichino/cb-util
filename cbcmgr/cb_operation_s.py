@@ -22,7 +22,8 @@ class CBOperation(CBSession):
 
     def __init__(self, *args, create: bool = False, quota: int = 256, replicas: int = 0, mode: BucketMode = BucketMode.DEFAULT, **kwargs):
         super().__init__(*args, **kwargs)
-        self._cluster: Cluster
+        logger.debug("begin operation class")
+        self._cluster: Cluster = self.session()
         self._bucket: Bucket
         self._bucket_name = None
         self._scope: Scope
@@ -34,10 +35,13 @@ class CBOperation(CBSession):
         self.replicas = replicas
         self.bucket_mode = mode
 
-    def connect(self):
-        logger.debug(f"connect: connect string {self.cb_connect_string}")
-        self._cluster = self.session()
-        return self
+    def connect(self, keyspace: str):
+        parts = keyspace.split('.')
+        bucket = parts[0]
+        scope = parts[1] if len(parts) > 1 else "_default"
+        collection = parts[2] if len(parts) > 2 else "_default"
+        logger.debug(f"connecting to {keyspace}")
+        return self.bucket(bucket).scope(scope).collection(collection)
 
     def bucket(self, name: str):
         if name is None:

@@ -41,6 +41,11 @@ class BucketMode(Enum):
 
 
 class CBSession(object):
+    HOSTNAME: str
+    USERNAME: str
+    PASSWORD: str
+    SSL: bool
+    EXTERNAL: bool
 
     def __init__(self, hostname: str, username: str, password: str, ssl=False, external=False, kv_timeout: int = 5, query_timeout: int = 60):
         self.cluster_node_count = None
@@ -53,6 +58,7 @@ class CBSession(object):
         self._collection_name = "_default"
         self.kv_timeout = kv_timeout
         self.query_timeout = query_timeout
+        self.hostname = hostname
         self.username = username
         self.password = password
         self.ssl = ssl
@@ -102,6 +108,27 @@ class CBSession(object):
 
         self.is_reachable()
         self.check_cluster()
+
+        CBSession.HOSTNAME = self.hostname
+        CBSession.USERNAME = self.username
+        CBSession.PASSWORD = self.password
+        CBSession.SSL = self.ssl
+        CBSession.EXTERNAL = self.use_external_network
+
+    def get_hostname(self) -> str:
+        return self.hostname
+
+    def get_username(self) -> str:
+        return self.username
+
+    def get_password(self) -> str:
+        return self.password
+
+    def get_ssl(self) -> bool:
+        return self.ssl
+
+    def get_external(self) -> bool:
+        return self.use_external_network
 
     @retry()
     def session(self) -> Cluster:

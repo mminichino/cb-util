@@ -263,15 +263,18 @@ def manual_4(hostname, bucket, tls, scope, collection, file):
 
 
 def manual_5(hostname, bucket, tls, scope, collection):
+    keyspace = f"{bucket}.{scope}.{collection}"
     try:
-        op = CBOperation(hostname, "Administrator", "password", ssl=False).connect().bucket(bucket).scope(scope).collection(collection)
+        opm = CBOperation(hostname, "Administrator", "password", ssl=False)
+        col_a = opm.connect(keyspace)
     except (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException):
         pass
 
-    op = CBOperation(hostname, "Administrator", "password", ssl=False, quota=128, create=True).connect().bucket(bucket).scope(scope).collection(collection)
+    opm = CBOperation(hostname, "Administrator", "password", ssl=False, quota=128, create=True)
+    col_a = opm.connect(keyspace)
 
-    op.put_doc("test::1", document)
-    d = op.get_doc("test::1")
+    col_a.put_doc("test::1", document)
+    d = col_a.get_doc("test::1")
     assert d == document
 
 
