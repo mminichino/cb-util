@@ -1,7 +1,7 @@
 ##
 ##
 
-from .exceptions import (IndexInternalError, CollectionGetError, NodeConnectionTimeout, NodeConnectionError, NodeConnectionFailed, ClusterHealthCheckError, KeyFormatError)
+from .exceptions import (IndexInternalError, CollectionGetError, CollectionCountError, NodeConnectionError, NodeConnectionFailed, ClusterHealthCheckError, KeyFormatError)
 from .retry import retry
 from .httpsessionmgr import APISession
 from .config import KeyStyle
@@ -142,6 +142,16 @@ class CBConnectLite(CBSession):
             collection.exists("null")
         except Exception as err:
             raise CollectionGetError(f"collection {name}: key exists error: {err}")
+
+    @retry()
+    def collection_count(self, cluster: Cluster, keyspace: str) -> int:
+        try:
+            sql = 'select count(*) as count from ' + keyspace + ';'
+            result = self.run_query(cluster, sql)
+            count: int = int(result[0]['count'])
+            return count
+        except Exception as err:
+            raise CollectionCountError(f"failed to get count for {keyspace}: {err}")
 
     @retry(always_raise_list=(QueryIndexAlreadyExistsException, QueryIndexNotFoundException))
     def run_query(self, cluster: Cluster, sql: str):

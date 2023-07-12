@@ -3,9 +3,14 @@
 import warnings
 import pytest
 import json
+import string
+from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException)
 from cbcmgr.cb_connect import CBConnect
 from cbcmgr.cb_management import CBManager
-from cbcmgr.config import UpsertMapConfig, MapUpsertType, KeyStyle
+from cbcmgr.config import UpsertMapConfig, MapUpsertType
+from cbcmgr.cb_operation_s import CBOperation, Operation
+from cbcmgr.cb_pathmap import CBPathMap
+from cbcmgr.mt_pool import CBPool
 
 
 warnings.filterwarnings("ignore")
@@ -168,38 +173,93 @@ def test_cb_driver_1(hostname, bucket, tls, scope, collection):
 @pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
 @pytest.mark.parametrize("tls", [False, True])
 def test_cb_driver_2(hostname, bucket, tls, scope, collection):
-    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
-    dbm.create_bucket(bucket)
-    dbm.create_scope(scope)
-    dbm.create_collection(collection)
-
     cfg = UpsertMapConfig().new()
-    cfg.add('addresses.billing', collection=True)
-    cfg.add('addresses.delivery', collection=True)
+    cfg.add('addresses.billing')
+    cfg.add('addresses.delivery')
     cfg.add('history.events',
             p_type=MapUpsertType.LIST,
-            collection=True,
-            doc_id=KeyStyle.TEXT_FIELD,
             id_key="event_id")
 
-    dbm.cb_map_upsert("testdata", cfg, json_data=json.dumps(json_data, indent=2))
+    p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=False, quota=128)
+    p_map.load_data("testdata", json_data=json.dumps(json_data, indent=2))
+    CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 
 
 @pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
 @pytest.mark.parametrize("tls", [False, True])
 def test_cb_driver_3(hostname, bucket, tls, scope, collection):
-    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
-    dbm.create_bucket(bucket)
-    dbm.create_scope(scope)
-    dbm.create_collection(collection)
-
     cfg = UpsertMapConfig().new()
-    cfg.add('root.addresses.billing', collection=True)
-    cfg.add('root.addresses.delivery', collection=True)
+    cfg.add('root.addresses.billing')
+    cfg.add('root.addresses.delivery')
     cfg.add('root.history.events',
             p_type=MapUpsertType.LIST,
-            collection=True,
-            doc_id=KeyStyle.TEXT_FIELD,
             id_key="event_id")
 
-    dbm.cb_map_upsert("testdata", cfg, xml_data=xml_data)
+    p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=False, quota=128)
+    p_map.load_data("testdata", xml_data=xml_data)
+    CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
+
+
+@pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
+@pytest.mark.parametrize("tls", [False, True])
+def test_cb_driver_4(hostname, bucket, tls, scope, collection):
+    keyspace = f"{bucket}.{scope}.{collection}"
+    try:
+        opm = CBOperation(hostname, "Administrator", "password", ssl=tls)
+        col_a = opm.connect(keyspace)
+        col_a.cleanup()
+    except (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException):
+        pass
+
+    col_a = CBOperation(hostname, "Administrator", "password", ssl=tls, quota=128, create=True).connect(keyspace)
+
+    col_a.put_doc(col_a.collection, "test::1", document)
+    d = col_a.get_doc(col_a.collection, "test::1")
+    assert d == document
+
+    col_a.index_by_query(f"select data from {keyspace}")
+
+    r = col_a.run_query(col_a.cluster, f"select data from {keyspace}")
+    assert r[0]['data'] == 'data'
+
+    col_a.cleanup()
+
+    col_t = CBOperation(hostname, "Administrator", "password", ssl=tls, quota=128, create=True).connect(keyspace)
+    a_read = col_t.get_operator(Operation.READ)
+    a_write = col_t.get_operator(Operation.WRITE)
+    a_query = col_t.get_operator(Operation.QUERY)
+
+    a_write.prep("test::1", document)
+    a_write.execute()
+    a_read.prep("test::1")
+    a_read.execute()
+    assert document == a_read.result["test::1"]
+
+    col_t.index_by_query(f"select data from {keyspace}")
+    a_query.prep(f"select data from {keyspace}")
+    a_query.execute()
+    assert a_query.result[0]['data'] == 'data'
+
+    col_a.cleanup()
+
+
+@pytest.mark.parametrize("scope", ["_default", "test"])
+@pytest.mark.parametrize("collection", ["test"])
+@pytest.mark.parametrize("tls", [False, True])
+def test_cb_driver_5(hostname, bucket, tls, scope, collection):
+    pool = CBPool(hostname, "Administrator", "password", ssl=tls, quota=128, create=True)
+
+    for n in range(10):
+        c = string.ascii_lowercase[n:n + 1]
+        keyspace = f"{bucket}.{scope}.{collection}{c}"
+        pool.connect(keyspace)
+        for i in range(1000):
+            pool.dispatch(keyspace, Operation.WRITE, f"test::{i+1}", document)
+
+    pool.join()
+    count = 0
+    for n in range(10):
+        c = string.ascii_lowercase[n:n + 1]
+        keyspace = f"{bucket}.{scope}.{collection}{c}"
+        count += CBOperation(hostname, "Administrator", "password", ssl=tls).connect(keyspace).get_count()
+    assert count == 10000

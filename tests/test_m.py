@@ -311,6 +311,12 @@ def manual_6(hostname, bucket, tls, scope, collection):
             pool.dispatch(keyspace, Operation.WRITE, f"test::{i+1}", document)
 
     pool.join()
+    count = 0
+    for n in range(10):
+        c = string.ascii_lowercase[n:n + 1]
+        keyspace = f"{bucket}.{scope}.{collection}{c}"
+        count += CBOperation(hostname, "Administrator", "password", ssl=tls).connect(keyspace).get_count()
+    assert count == 10000
 
 
 p = Params()

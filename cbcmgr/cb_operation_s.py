@@ -188,6 +188,9 @@ class CBOperation(CBConnectLite):
         except (BucketNotFoundException, BucketDoesNotExistException):
             pass
 
+    def get_count(self) -> int:
+        return self.collection_count(self._cluster, self.get_keyspace)
+
     @property
     def cluster(self):
         return self._cluster
@@ -203,6 +206,10 @@ class CBOperation(CBConnectLite):
     @property
     def collection(self):
         return self._collection
+
+    @property
+    def get_keyspace(self):
+        return f"{self._bucket_name}.{self._scope_name}.{self._collection_name}"
 
     def get_operator(self, op: Operation):
         if op == Operation.READ:
