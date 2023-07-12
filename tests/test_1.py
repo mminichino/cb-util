@@ -181,6 +181,7 @@ def test_cb_driver_2(hostname, bucket, tls, scope, collection):
             id_key="event_id")
 
     p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=False, quota=128)
+    p_map.connect()
     p_map.load_data("testdata", json_data=json.dumps(json_data, indent=2))
     CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 
@@ -196,6 +197,7 @@ def test_cb_driver_3(hostname, bucket, tls, scope, collection):
             id_key="event_id")
 
     p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=False, quota=128)
+    p_map.connect()
     p_map.load_data("testdata", xml_data=xml_data)
     CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 

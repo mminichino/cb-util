@@ -48,6 +48,11 @@ class CBPathMap(object):
                            mode=self.mode,
                            create=True)
 
+    def connect(self):
+        for c in self.config.paths:
+            keyspace = f"{self.bucket}.{self.scope}.{c.name}"
+            self.pool.connect(keyspace)
+
     def load_data(self,
                   prefix: str,
                   json_file: str = None,
