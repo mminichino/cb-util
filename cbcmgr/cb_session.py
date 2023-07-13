@@ -9,7 +9,6 @@ import logging
 import socket
 import dns.resolver
 import uuid
-import hashlib
 from typing import Union
 from enum import Enum
 from datetime import timedelta
@@ -17,18 +16,7 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.options import ClusterTimeoutOptions, LockMode, ClusterOptions, TLSVerifyMode
 from couchbase.cluster import Cluster
 from acouchbase.cluster import AsyncCluster
-from couchbase.bucket import Bucket
-from acouchbase.bucket import AsyncBucket
-from couchbase.scope import Scope
-from acouchbase.scope import AsyncScope
-from couchbase.collection import Collection
-from acouchbase.collection import AsyncCollection
 from couchbase.diagnostics import ServiceType, PingState
-from couchbase.management.buckets import CreateBucketSettings, BucketType, StorageBackend
-from couchbase.management.collections import CollectionSpec
-from couchbase.management.options import CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions
-from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException, BucketAlreadyExistsException, ScopeAlreadyExistsException,
-                                  CollectionAlreadyExistsException, QueryIndexAlreadyExistsException)
 
 logger = logging.getLogger('cbutil.session')
 logger.addHandler(logging.NullHandler())

@@ -6,7 +6,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='cbcmgr',
-    version='1.4.1',
+    version='1.4.2',
     packages=['cbcmgr'],
     url='https://github.com/mminichino/cb-util',
     license='MIT License',
@@ -18,6 +18,7 @@ setup(
         'dnspython',
         'docker',
         'pytest',
+        'pytest-asyncio',
         'requests',
         'urllib3',
         'xmltodict'
