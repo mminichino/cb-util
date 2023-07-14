@@ -12,6 +12,7 @@ $ pip install cbcmgr
 
 Usage
 =====
+Original syntax (package is backwards compatible):
 ```
 >>> from cbcmgr.cb_connect import CBConnect
 >>> from cbcmgr.cb_management import CBManager
@@ -25,4 +26,28 @@ Usage
 >>> result = dbc.cb_get("test::1")
 >>> print(result)
 {'data': 1}
+```
+New Operator syntax:
+```
+keyspace = "test.test.test"
+db = CBOperation(hostname, "Administrator", "password", ssl=False, quota=128, create=True).connect(keyspace)
+db.put_doc(col_a.collection, "test::1", document)
+d = db.get_doc(col_a.collection, "test::1")
+assert d == document
+db.index_by_query("select data from test.test.test")
+r = db.run_query(col_a.cluster, "select data from test.test.test")
+assert r[0]['data'] == 'data'
+```
+Thread Pool Syntax:
+```
+pool = CBPool(hostname, "Administrator", "password", ssl=False, quota=128, create=True)
+pool.connect(keyspace)
+pool.dispatch(keyspace, Operation.WRITE, f"test::1", document)
+pool.join()
+```
+Async Pool Syntax
+```
+pool = CBPoolAsync(hostname, "Administrator", "password", ssl=False, quota=128, create=True)
+await pool.connect(keyspace)
+await pool.join()
 ```

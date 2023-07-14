@@ -4,6 +4,8 @@
 import concurrent.futures
 import logging
 import os
+import itertools
+from typing import Union
 from cbcmgr.exceptions import TaskError
 from cbcmgr.cb_session import BucketMode
 from cbcmgr.cb_operation_s import CBOperation, Operation
@@ -25,10 +27,16 @@ class CBPool(object):
                  create: bool = False,
                  quota: int = 256,
                  replicas: int = 0,
-                 mode: BucketMode = BucketMode.DEFAULT):
+                 mode: BucketMode = BucketMode.DEFAULT,
+                 connections: Union[None, int] = None):
         self.keyspace = {}
         self.tasks = set()
-        self.max_threads = min(64, os.cpu_count() * 4)
+        if connections:
+            self.connections = connections
+        else:
+            self.connections = os.cpu_count()
+        self.index_cycle = itertools.cycle(range(self.connections))
+        self.max_threads = max(self.connections * 4, os.cpu_count() * 4)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_threads)
         self.hostname = hostname
         self.username = username
@@ -46,19 +54,22 @@ class CBPool(object):
         if keyspace in self.keyspace:
             return
         logger.debug(f"pool add: {self.hostname} {keyspace} create is {self.create}")
-        self.keyspace[keyspace] = CBOperation(self.hostname,
-                                              self.username,
-                                              self.password,
-                                              ssl=self.ssl,
-                                              kv_timeout=self.kv_timeout,
-                                              query_timeout=self.query_timeout,
-                                              quota=self.quota,
-                                              replicas=self.replicas,
-                                              mode=self.mode,
-                                              create=self.create).connect(keyspace)
+        self.keyspace[keyspace] = [None] * self.connections
+        for num in range(self.connections):
+            self.keyspace[keyspace][num] = CBOperation(self.hostname,
+                                                       self.username,
+                                                       self.password,
+                                                       ssl=self.ssl,
+                                                       kv_timeout=self.kv_timeout,
+                                                       query_timeout=self.query_timeout,
+                                                       quota=self.quota,
+                                                       replicas=self.replicas,
+                                                       mode=self.mode,
+                                                       create=self.create).connect(keyspace)
 
     def dispatch(self, keyspace: str, op: Operation, *args):
-        opm = self.keyspace[keyspace]
+        index = next(self.index_cycle)
+        opm = self.keyspace[keyspace][index]
         operator = opm.get_operator(op)
         operator.prep(*args)
         self.tasks.add(self.executor.submit(operator.execute))

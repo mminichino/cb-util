@@ -178,11 +178,12 @@ def perf_1(hostname, bucket, tls, scope, collection):
     ops = 100000
     print(f"=> Performance Test 1 ({ops} records)")
     pool = CBPool(hostname, "Administrator", "password", ssl=False, quota=128, create=True)
+    print(f"  -> {pool.connections} connections, {pool.max_threads} threads")
 
     start_time = time.time()
     keyspace = f"{bucket}.{scope}.{collection}"
+    pool.connect(keyspace)
     for i in range(ops):
-        pool.connect(keyspace)
         pool.dispatch(keyspace, Operation.WRITE, f"test::{i+1:06d}", document)
     pool.join()
     end_time = time.time()
@@ -202,6 +203,7 @@ def perf_2(hostname, bucket, tls, scope, collection):
     collections = 10
     print(f"=> Performance Test 2 ({ops} records / {collections} collections)")
     pool = CBPool(hostname, "Administrator", "password", ssl=False, quota=128, create=True)
+    print(f"  -> {pool.connections} connections, {pool.max_threads} threads")
 
     start_time = time.time()
     for n in range(ops):
