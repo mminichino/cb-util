@@ -28,7 +28,7 @@ class CBPool(object):
                  mode: BucketMode = BucketMode.DEFAULT):
         self.keyspace = {}
         self.tasks = set()
-        self.max_threads = min(64, os.cpu_count() * 2)
+        self.max_threads = min(64, os.cpu_count() * 4)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_threads)
         self.hostname = hostname
         self.username = username
