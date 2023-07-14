@@ -3,6 +3,7 @@
 
 import concurrent.futures
 import logging
+import os
 from cbcmgr.exceptions import TaskError
 from cbcmgr.cb_session import BucketMode
 from cbcmgr.cb_operation_s import CBOperation, Operation
@@ -27,12 +28,15 @@ class CBPool(object):
                  mode: BucketMode = BucketMode.DEFAULT):
         self.keyspace = {}
         self.tasks = set()
-        self.executor = concurrent.futures.ThreadPoolExecutor()
+        self.max_threads = min(64, os.cpu_count() * 2)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_threads)
         self.hostname = hostname
         self.username = username
         self.password = password
         self.ssl = ssl
         self.external = external
+        self.kv_timeout = kv_timeout
+        self.query_timeout = query_timeout
         self.create = create
         self.quota = quota
         self.replicas = replicas
@@ -46,6 +50,8 @@ class CBPool(object):
                                               self.username,
                                               self.password,
                                               ssl=self.ssl,
+                                              kv_timeout=self.kv_timeout,
+                                              query_timeout=self.query_timeout,
                                               quota=self.quota,
                                               replicas=self.replicas,
                                               mode=self.mode,

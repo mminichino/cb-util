@@ -25,7 +25,8 @@ class CBPoolAsync(object):
                  create: bool = False,
                  quota: int = 256,
                  replicas: int = 0,
-                 mode: BucketMode = BucketMode.DEFAULT):
+                 mode: BucketMode = BucketMode.DEFAULT,
+                 throttle: bool = False):
         self.keyspace = {}
         self.tasks = set()
         self.loop = asyncio.get_event_loop()
@@ -34,12 +35,16 @@ class CBPoolAsync(object):
         self.password = password
         self.ssl = ssl
         self.external = external
+        self.kv_timeout = kv_timeout
+        self.query_timeout = query_timeout
         self.create = create
         self.quota = quota
         self.replicas = replicas
         self.mode = mode
-        self.max_tasks = min(100, os.cpu_count() * 10)
+        self.max_tasks = max(32, os.cpu_count() * 2)
         self.factor = 0.01
+        self.throttle = throttle
+        self.retry_number = 0
 
     async def connect(self, keyspace):
         if keyspace in self.keyspace:
@@ -49,6 +54,8 @@ class CBPoolAsync(object):
                                self.username,
                                self.password,
                                ssl=self.ssl,
+                               kv_timeout=self.kv_timeout,
+                               query_timeout=self.query_timeout,
                                quota=self.quota,
                                replicas=self.replicas,
                                mode=self.mode,
@@ -57,11 +64,17 @@ class CBPoolAsync(object):
         self.keyspace[keyspace] = await opm.connect(keyspace)
 
     async def dispatch(self, keyspace: str, op: Operation, *args):
-        retry_number = 0
-        while len(asyncio.all_tasks()) > self.max_tasks:
+        if self.throttle and len(asyncio.all_tasks()) > (self.max_tasks * 1.1):
+            self.retry_number += 1
             wait = self.factor
-            wait *= (2 ** (retry_number + 1))
+            wait *= (2 ** self.retry_number)
             await asyncio.sleep(wait)
+        elif self.throttle and len(asyncio.all_tasks()) > self.max_tasks:
+            wait = self.factor
+            wait *= (2 ** self.retry_number)
+            await asyncio.sleep(wait)
+        else:
+            self.retry_number = 0
         opm = self.keyspace[keyspace]
         operator = opm.get_operator(op)
         operator.prep(*args)

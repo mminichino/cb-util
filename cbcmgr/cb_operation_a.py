@@ -4,7 +4,6 @@
 from __future__ import annotations
 import logging
 from typing import Union, Dict, Any, List
-from enum import Enum
 from acouchbase.cluster import AsyncCluster
 from acouchbase.bucket import AsyncBucket
 from acouchbase.scope import AsyncScope
@@ -12,19 +11,11 @@ from acouchbase.collection import AsyncCollection
 from couchbase.exceptions import (BucketDoesNotExistException, BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException)
 from cbcmgr.cb_session import BucketMode
 from cbcmgr.cb_connect_lite_a import CBConnectLiteAsync
-from cbcmgr.retry import retry
-from cbcmgr.exceptions import CollectionCountError
-from cbcmgr.httpsessionmgr import APISession
+from cbcmgr.cb_operation_s import Operation
 
 logger = logging.getLogger('cbutil.operation')
 logger.addHandler(logging.NullHandler())
 JSONType = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
-
-
-class Operation(Enum):
-    READ = 0
-    WRITE = 1
-    QUERY = 2
 
 
 class CBOperationAsync(CBConnectLiteAsync):
