@@ -3,8 +3,6 @@ import cbcmgr
 from pathlib import Path
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
-with open('requirements.txt') as f:
-    required = f.read().splitlines()
 
 setup(
     name='cbcmgr',
@@ -14,7 +12,18 @@ setup(
     license='MIT License',
     author='Michael Minichino',
     python_requires='>=3.8',
-    install_requires=required,
+    install_requires=[
+        "attrs>=22.2.0",
+        "couchbase==4.1.5",
+        "dnspython>=2.3.0",
+        "docker>=5.0.3",
+        "pytest>=7.0.1",
+        "pytest-asyncio>=0.16.0",
+        "requests>=2.31.0",
+        "urllib3==1.26.16",
+        "xmltodict>=0.13.0",
+        "bumpversion>=0.6.0",
+    ],
     author_email='info@unix.us.com',
     description='Couchbase connection manager',
     long_description=long_description,
