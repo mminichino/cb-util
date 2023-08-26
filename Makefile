@@ -1,5 +1,7 @@
 .PHONY:	setup push all
 
+version:
+		bumpversion patch
 setup:
 		python setup.py sdist
 push:

@@ -4,6 +4,7 @@ import warnings
 import pytest
 import json
 import string
+import time
 from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException)
 from cbcmgr.cb_connect import CBConnect
 from cbcmgr.cb_management import CBManager
@@ -259,6 +260,7 @@ def test_cb_driver_5(hostname, bucket, tls, scope, collection):
             pool.dispatch(keyspace, Operation.WRITE, f"test::{i+1}", document)
 
     pool.join()
+    time.sleep(1)
     count = 0
     for n in range(10):
         c = string.ascii_lowercase[n:n + 1]

@@ -7,3 +7,4 @@ pytest-asyncio==0.21.1
 requests==2.31.0
 urllib3==1.26.16
 xmltodict==0.13.0
+bumpversion>=0.6.0

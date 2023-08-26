@@ -1,28 +1,20 @@
 from setuptools import setup
-
+import cbcmgr
 from pathlib import Path
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
+with open('requirements.txt') as f:
+    required = f.read().splitlines()
 
 setup(
     name='cbcmgr',
-    version='1.4.4',
+    version=cbcmgr.__version__,
     packages=['cbcmgr'],
     url='https://github.com/mminichino/cb-util',
     license='MIT License',
     author='Michael Minichino',
-    python_requires='>=3.9',
-    install_requires=[
-        'attrs',
-        'couchbase',
-        'dnspython',
-        'docker',
-        'pytest',
-        'pytest-asyncio',
-        'requests',
-        'urllib3',
-        'xmltodict'
-    ],
+    python_requires='>=3.8',
+    install_requires=required,
     author_email='info@unix.us.com',
     description='Couchbase connection manager',
     long_description=long_description,

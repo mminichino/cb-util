@@ -7,6 +7,7 @@ import os
 import logging
 import json
 import string
+import time
 from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException)
 
 current = os.path.dirname(os.path.realpath(__file__))
@@ -138,6 +139,7 @@ class Params(object):
         parser.add_argument('--stop', action='store_true', help="Stop Container")
         parser.add_argument("--external", action="store_true")
         parser.add_argument("--pool", action="store_true")
+        parser.add_argument("--basic", action="store_true")
         parser.add_argument("--map", action="store_true")
         parser.add_argument("--verbose", action="store_true")
         parser.add_argument("--file", action="store", help="Input File")
@@ -311,6 +313,7 @@ def manual_6(hostname, bucket, tls, scope, collection):
             pool.dispatch(keyspace, Operation.WRITE, f"test::{i+1}", document)
 
     pool.join()
+    time.sleep(1)
     count = 0
     for n in range(10):
         c = string.ascii_lowercase[n:n + 1]
@@ -352,7 +355,7 @@ if options.file:
 
 if options.pool:
     manual_5(options.host, "test", options.ssl, "test", "test")
-    manual_6(options.host, "test", options.ssl, "test", "test")
+    manual_6(options.host, "test", options.ssl, "_default", "test")
     sys.exit(0)
 
 if options.map:
@@ -360,4 +363,5 @@ if options.map:
     manual_3(options.host, "test", options.ssl, "test", "test")
     sys.exit(0)
 
-manual_1(options.host, "test", options.ssl, "test", "test")
+if options.basic:
+    manual_1(options.host, "test", options.ssl, "test", "test")

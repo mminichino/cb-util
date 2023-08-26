@@ -16,8 +16,7 @@ from couchbase.management.buckets import CreateBucketSettings, BucketType, Stora
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions
 from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException, BucketAlreadyExistsException, ScopeAlreadyExistsException,
-                                  CollectionAlreadyExistsException, QueryIndexAlreadyExistsException, QueryIndexNotFoundException, DocumentNotFoundException,
-                                  WatchQueryIndexTimeoutException)
+                                  CollectionAlreadyExistsException, QueryIndexAlreadyExistsException, DocumentNotFoundException, WatchQueryIndexTimeoutException)
 
 logger = logging.getLogger('cbutil.connect.lite')
 logger.addHandler(logging.NullHandler())
@@ -164,7 +163,7 @@ class CBConnectLite(CBSession):
             raise IndexInternalError(f"can not determine index for query")
 
     @retry()
-    def create_indexes(self, cluster: Cluster, bucket: Bucket, scope: Scope, collection: Collection, fields: list[str], replica: int = 0):
+    def create_indexes(self, cluster: Cluster, bucket: Bucket, scope: Scope, collection: Collection, fields: List[str], replica: int = 0):
         if collection.name != '_default':
             index_options = CreateQueryIndexOptions(deferred=False,
                                                     num_replicas=replica,
