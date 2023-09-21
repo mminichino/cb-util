@@ -23,6 +23,11 @@ setup(
         "urllib3==1.26.16",
         "xmltodict>=0.13.0",
         "bumpversion>=0.6.0",
+        "overrides>=7.4.0",
+        "Jinja2==3.1.2",
+        "pandas>=1.5.3",
+        "numpy>=1.24.3",
+        "Pillow>=8.4.0"
     ],
     author_email='info@unix.us.com',
     description='Couchbase connection manager',

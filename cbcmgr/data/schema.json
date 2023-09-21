@@ -1,0 +1,604 @@
+{
+  "inventory": [
+    {
+      "external_file": {
+        "buckets": [
+          {
+            "name": "{{ BUCKET_PARAMETER }}",
+            "scopes": [
+              {
+                "name": "_default",
+                "collections": [
+                  {
+                    "name": "_default",
+                    "schema": "{{ FILE_PARAMETER }}",
+                    "idkey": "{{ ID_FIELD_PARAMETER }}",
+                    "primary_index": false,
+                    "override_count": false,
+                    "indexes": [
+                      "{{ ID_FIELD_PARAMETER }}"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "default": {
+        "buckets": [
+          {
+            "name": "cbperf",
+            "scopes": [
+              {
+                "name": "_default",
+                "collections": [
+                  {
+                    "name": "_default",
+                    "schema": {
+                      "record_id": "record_id",
+                      "first_name": "{{ rand_first }}",
+                      "last_name": "{{ rand_last }}",
+                      "address": "{{ rand_address }}",
+                      "city": "{{ rand_city }}",
+                      "state": "{{ rand_state }}",
+                      "zip_code": "{{ rand_zip_code }}",
+                      "phone": "{{ rand_phone }}",
+                      "ssn": "{{ rand_ssn }}",
+                      "dob": "{{ rand_dob_1 }}",
+                      "account_number": "{{ rand_account }}",
+                      "card_number": "{{ rand_credit_card }}",
+                      "transactions": [
+                        {
+                          "id": "{{ rand_id }}",
+                          "date": "{{ rand_date_1 }}",
+                          "amount": "{{ rand_dollar }}"
+                        }
+                      ]
+                    },
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": false,
+                    "indexes": [
+                      "record_id",
+                      "last_name"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "profile_demo": {
+        "buckets": [
+          {
+            "name": "sample_app",
+            "scopes": [
+              {
+                "name": "profiles",
+                "collections": [
+                  {
+                    "name": "user_data",
+                    "schema": {
+                      "record_id": "record_id",
+                      "name": "{{ rand_first }} {{ rand_last }}",
+                      "nickname": "{{ rand_nickname }}",
+                      "picture": "",
+                      "user_id": "{{ rand_username }}",
+                      "email": "{{ rand_email }}",
+                      "email_verified": "{{ rand_bool }}",
+                      "first_name": "{{ rand_first }}",
+                      "last_name": "{{ rand_last }}",
+                      "address": "{{ rand_address }}",
+                      "city": "{{ rand_city }}",
+                      "state": "{{ rand_state }}",
+                      "zip_code": "{{ rand_zip_code }}",
+                      "phone": "{{ rand_phone }}",
+                      "date_of_birth": "{{ rand_dob_1 }}"
+                    },
+                    "idkey": "record_id",
+                    "primary_index": true,
+                    "override_count": false,
+                    "indexes": [
+                      "record_id",
+                      "nickname",
+                      "user_id"
+                    ]
+                  },
+                  {
+                    "name": "user_images",
+                    "schema": {
+                      "record_id": "record_id",
+                      "type": "jpeg",
+                      "image": "{{ rand_image }}"
+                    },
+                    "idkey": "record_id",
+                    "primary_index": true,
+                    "override_count": false,
+                    "batch_size": 10,
+                    "indexes": [
+                      "record_id"
+                    ]
+                  },
+                  {
+                    "name": "service_auth",
+                    "schema": {
+                      "record_id": "record_id",
+                      "token": "{{ rand_hash }}"
+                    },
+                    "idkey": "record_id",
+                    "primary_index": true,
+                    "override_count": true,
+                    "record_count": 1,
+                    "indexes": [
+                      "record_id"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "rules": [
+          {
+            "name": "rule0",
+            "type": "link",
+            "id_field": "record_id",
+            "foreign_key": "sample_app:profiles:user_data:picture",
+            "primary_key": "sample_app:profiles:user_images:record_id",
+            "sql" : "MERGE INTO sample_app.profiles.user_data u USING sample_app.profiles.user_images i ON u.record_id = i.record_id WHEN MATCHED THEN UPDATE SET u.picture = meta(i).id ;"
+          }
+        ]
+      }
+    },
+    {
+      "employee_demo": {
+        "buckets": [
+          {
+            "name": "employees",
+            "scopes": [
+              {
+                "name": "_default",
+                "collections": [
+                  {
+                    "name": "_default",
+                    "schema": {
+                      "record_id": "record_id",
+                      "store_id": "{{ incr_block }}",
+                      "employee_id": "{{ incr_value }}",
+                      "name": "{{ rand_first }} {{ rand_last }}",
+                      "user_id": "{{ rand_username }}",
+                      "email": "{{ rand_email }}",
+                      "email_verified": "{{ rand_bool }}",
+                      "first_name": "{{ rand_first }}",
+                      "last_name": "{{ rand_last }}",
+                      "address": "{{ rand_address }}",
+                      "city": "{{ rand_city }}",
+                      "state": "{{ rand_state }}",
+                      "zip_code": "{{ rand_zip_code }}",
+                      "phone": "{{ rand_phone }}",
+                      "date_of_birth": "{{ rand_dob_1 }}",
+                      "password": "{{ rand_password }}",
+                      "timecards": []
+                    },
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": false,
+                    "indexes": [
+                      "record_id",
+                      "store_id",
+                      "employee_id"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "adjuster_demo": {
+        "buckets": [
+          {
+            "name": "adjuster_demo",
+            "scopes": [
+              {
+                "name": "_default",
+                "collections": [
+                  {
+                    "name": "_default",
+                    "schema": [
+                      {
+                        "id_key": "claim_id",
+                        "doc": {
+                          "record_id": "record_id",
+                          "claim_id": "{{ incr_value }}",
+                          "claim_date": "{{ date_iso_week }}",
+                          "customer_id": "{{ incr_value }}",
+                          "adjuster_id": 0,
+                          "claim_amount": 0.0,
+                          "claim_status": 0,
+                          "claim_paid": false,
+                          "region": "{{ region_name }}",
+                          "type": "claim"
+                        }
+                      },
+                      {
+                        "id_key": "customer_id",
+                        "doc": {
+                          "record_id": "record_id",
+                          "customer_id": "{{ incr_value }}",
+                          "name": "{{ rand_first }} {{ rand_last }}",
+                          "user_id": "{{ rand_username }}",
+                          "email": "{{ rand_email }}",
+                          "email_verified": true,
+                          "first_name": "{{ rand_first }}",
+                          "last_name": "{{ rand_last }}",
+                          "address": "{{ rand_address }}",
+                          "city": "{{ rand_city }}",
+                          "state": "{{ rand_state }}",
+                          "zip_code": "{{ rand_zip_code }}",
+                          "phone": "{{ rand_phone }}",
+                          "date_of_birth": "{{ rand_dob_1 }}",
+                          "password": "{{ rand_password }}",
+                          "region": "{{ region_name }}",
+                          "type": "customer"
+                        }
+                      },
+                      {
+                        "id_key": "employee_id",
+                        "doc": {
+                          "record_id": "record_id",
+                          "employee_id": "{{ incr_value }}",
+                          "division": "automotive",
+                          "user_id": "{{ rand_username }}",
+                          "email": "{{ rand_email }}",
+                          "first_name": "{{ rand_first }}",
+                          "last_name": "{{ rand_last }}",
+                          "address": "{{ rand_address }}",
+                          "city": "{{ rand_city }}",
+                          "state": "{{ rand_state }}",
+                          "zip_code": "{{ rand_zip_code }}",
+                          "phone": "{{ rand_phone }}",
+                          "password": "{{ rand_password }}",
+                          "region": "{{ region_name }}",
+                          "type": "adjuster"
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": false,
+                    "key_format": "type",
+                    "indexes": [
+                      "record_id",
+                      "claim_id",
+                      "customer_id",
+                      "employee_id",
+                      "user_id",
+                      "email",
+                      "division",
+                      "region",
+                      "type"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "insurance_sample": {
+        "buckets": [
+          {
+            "name": "insurance_sample",
+            "scopes": [
+              {
+                "name": "data",
+                "collections": [
+                  {
+                    "name": "company",
+                    "schema": [
+                      {
+                        "id_key": "record_id",
+                        "override_count": true,
+                        "record_count": 1,
+                        "doc": {
+                          "record_id": "record_id",
+                          "name": "Acme Insurance",
+                          "address": "{{ rand_address }}",
+                          "city": "{{ rand_city }}",
+                          "state": "{{ rand_state }}",
+                          "zip_code": "{{ rand_zip_code }}",
+                          "phone": "{{ rand_phone }}",
+                          "region": "global"
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": true,
+                    "record_count": 1,
+                    "key_format": "collection",
+                    "indexes": [
+                      "record_id",
+                      "region"
+                    ]
+                  },
+                  {
+                    "name": "claims",
+                    "schema": [
+                      {
+                        "id_key": "claim_id",
+                        "override_count": true,
+                        "record_count": 30,
+                        "doc": {
+                          "record_id": "record_id",
+                          "claim_id": "{{ incr_value }}",
+                          "claim_date": "{{ date_iso_week }}",
+                          "customer_id": "{{ incr_value }}",
+                          "adjuster_id": 0,
+                          "claim_amount": 0.0,
+                          "claim_status": 0,
+                          "claim_paid": false,
+                          "claim_locked": false,
+                          "region": "{{ region_name }}"
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": true,
+                    "record_count": 30,
+                    "key_format": "collection",
+                    "indexes": [
+                      "record_id",
+                      "claim_id",
+                      "customer_id",
+                      "adjuster_id",
+                      "region"
+                    ]
+                  },
+                  {
+                    "name": "customer",
+                    "schema": [
+                      {
+                        "id_key": "customer_id",
+                        "override_count": true,
+                        "record_count": 30,
+                        "doc": {
+                          "record_id": "record_id",
+                          "customer_id": "{{ incr_value }}",
+                          "name": "{{ rand_first }} {{ rand_last }}",
+                          "user_id": "{{ rand_username }}",
+                          "email": "{{ rand_email }}",
+                          "email_verified": true,
+                          "first_name": "{{ rand_first }}",
+                          "last_name": "{{ rand_last }}",
+                          "address": "{{ rand_address }}",
+                          "city": "{{ rand_city }}",
+                          "state": "{{ rand_state }}",
+                          "zip_code": "{{ rand_zip_code }}",
+                          "phone": "{{ rand_phone }}",
+                          "date_of_birth": "{{ rand_dob_1 }}",
+                          "password": "{{ rand_password }}",
+                          "region": "{{ region_name }}"
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": true,
+                    "record_count": 30,
+                    "key_format": "collection",
+                    "indexes": [
+                      "record_id",
+                      "customer_id",
+                      "user_id",
+                      "email",
+                      "region"
+                    ]
+                  },
+                  {
+                    "name": "adjuster",
+                    "schema": [
+                      {
+                        "id_key": "adjuster_id",
+                        "override_count": true,
+                        "record_count": 30,
+                        "doc": {
+                          "record_id": "record_id",
+                          "adjuster_id": "{{ incr_value }}",
+                          "user_id": "{{ rand_username }}",
+                          "email": "{{ rand_email }}",
+                          "first_name": "{{ rand_first }}",
+                          "last_name": "{{ rand_last }}",
+                          "address": "{{ rand_address }}",
+                          "city": "{{ rand_city }}",
+                          "state": "{{ rand_state }}",
+                          "zip_code": "{{ rand_zip_code }}",
+                          "phone": "{{ rand_phone }}",
+                          "password": "{{ rand_password }}",
+                          "region": "{{ region_name }}"
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": true,
+                    "record_count": 30,
+                    "key_format": "collection",
+                    "indexes": [
+                      "record_id",
+                      "adjuster_id",
+                      "user_id",
+                      "email",
+                      "region"
+                    ]
+                  },
+                  {
+                    "name": "picture",
+                    "schema": [
+                      {
+                        "id_key": "claim_id",
+                        "override_count": true,
+                        "record_count": 0,
+                        "doc": {
+                          "record_id": "record_id",
+                          "claim_id": "{{ incr_value }}",
+                          "date": "{{ date_iso_week }}",
+                          "image": {
+                            "@type": "blob",
+                            "digest": "",
+                            "length": 0,
+                            "content_type": "image/png"
+                          },
+                          "region": "{{ region_name }}"
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": true,
+                    "record_count": 0,
+                    "key_format": "compound",
+                    "indexes": [
+                      "record_id",
+                      "claim_id",
+                      "date",
+                      "region"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "timecard_sample": {
+        "buckets": [
+          {
+            "name": "timecard_sample",
+            "scopes": [
+              {
+                "name": "data",
+                "collections": [
+                  {
+                    "name": "employees",
+                    "schema": [
+                      {
+                        "id_key": "employee_id",
+                        "override_count": true,
+                        "record_count": 40,
+                        "doc": {
+                          "record_id": "record_id",
+                          "location_id": "{{ incr_block }}",
+                          "employee_id": "{{ incr_value }}",
+                          "name": "{{ rand_first }} {{ rand_last }}",
+                          "user_id": "{{ rand_username }}",
+                          "email": "{{ rand_email }}",
+                          "email_verified": "{{ rand_bool }}",
+                          "first_name": "{{ rand_first }}",
+                          "last_name": "{{ rand_last }}",
+                          "address": "{{ rand_address }}",
+                          "city": "{{ rand_city }}",
+                          "state": "{{ rand_state }}",
+                          "zip_code": "{{ rand_zip_code }}",
+                          "phone": "{{ rand_phone }}",
+                          "date_of_birth": "{{ rand_dob_1 }}",
+                          "password": "{{ rand_password }}",
+                          "rate": 15.0
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": true,
+                    "record_count": 40,
+                    "key_format": "collection",
+                    "indexes": [
+                      "record_id",
+                      "location_id",
+                      "employee_id",
+                      "user_id"
+                    ]
+                  },
+                  {
+                    "name": "locations",
+                    "schema": [
+                      {
+                        "id_key": "location_id",
+                        "override_count": true,
+                        "record_count": 4,
+                        "doc": {
+                          "record_id": "record_id",
+                          "location_id": "{{ incr_value }}",
+                          "name": "{{ rand_franchise }}",
+                          "address": "{{ rand_address }}",
+                          "city": "{{ rand_city }}",
+                          "state": "{{ rand_state }}",
+                          "zip_code": "{{ rand_zip_code }}",
+                          "phone": "{{ rand_phone }}"
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": true,
+                    "record_count": 4,
+                    "key_format": "collection",
+                    "indexes": [
+                      "record_id",
+                      "location_id",
+                      "name"
+                    ]
+                  },
+                  {
+                    "name": "timecards",
+                    "schema": [
+                      {
+                        "id_key": "record_id",
+                        "override_count": true,
+                        "record_count": 0,
+                        "doc": {
+                          "record_id": "record_id",
+                          "location_id": "{{ incr_block }}",
+                          "employee_id": "{{ incr_value }}",
+                          "status": false,
+                          "time_in": "",
+                          "time_out": "",
+                          "duration": 0,
+                          "paid": false
+                        }
+                      }
+                    ],
+                    "idkey": "record_id",
+                    "primary_index": false,
+                    "override_count": true,
+                    "record_count": 0,
+                    "key_format": "collection",
+                    "indexes": [
+                      "record_id",
+                      "location_id",
+                      "employee_id"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,17 +1,14 @@
+# cb-util 1.5.1
 
-
-Couchbase Connection Manager
-============================
+## Couchbase Utilities
 Couchbase connection manager. Simplifies connecting to a Couchbase cluster and performing data and management operations.
 
-Installing
-==========
+## Installing
 ```
 $ pip install cbcmgr
 ```
 
-Usage
-=====
+## Usage
 Original syntax (package is backwards compatible):
 ```
 >>> from cbcmgr.cb_connect import CBConnect
