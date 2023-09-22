@@ -61,6 +61,21 @@ class CustomLogFormatter(logging.Formatter):
         return formatter.format(record)
 
 
+class CustomNullFormatter(logging.Formatter):
+    FORMATS = {
+        logging.DEBUG: f"{C.FORMAT_MESSAGE}",
+        logging.INFO: f"{C.FORMAT_MESSAGE}",
+        logging.WARNING: f"{C.FORMAT_MESSAGE}",
+        logging.ERROR: f"{C.FORMAT_MESSAGE}",
+        logging.CRITICAL: f"{C.FORMAT_MESSAGE}"
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
 class StreamOutputLogger(object):
     def __init__(self, _logger, _level, _file=None):
         self.logger = _logger
@@ -97,10 +112,14 @@ class CLI(object):
 
         self.init_parser()
 
+        screen_handler = logging.StreamHandler()
+
         if sys.stdin and sys.stdin.isatty():
-            screen_handler = logging.StreamHandler()
             screen_handler.setFormatter(CustomDisplayFormatter())
-            logger.addHandler(screen_handler)
+        else:
+            screen_handler.setFormatter(CustomNullFormatter())
+
+        logger.addHandler(screen_handler)
 
         file_handler = logging.FileHandler(debug_file)
         file_handler.setFormatter(CustomLogFormatter())

@@ -1,5 +1,5 @@
 .PHONY:	setup push all version test_cli
-export PYTHONPATH := $(shell pwd)/test:$(shell pwd):$(PYTHONPATH)
+export PYTHONPATH := $(shell pwd)/tests:$(shell pwd):$(PYTHONPATH)
 
 version:
 		bumpversion patch

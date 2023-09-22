@@ -66,6 +66,9 @@ class CBCUtil(CLI):
         opt_parser.add_argument('--replica', action='store', help="Replica Count", type=int_arg, default=1)
         opt_parser.add_argument('--quota', action='store', help="Bucket Memory Quota", type=int_arg)
         opt_parser.add_argument('--id', action='store', help="ID field for file based collection schema", default="record_id")
+        opt_parser.add_argument('--ping', action='store_true', help='Show cluster ping output')
+        opt_parser.add_argument('--test', action='store_true', help='Just check status and error if not ready')
+        opt_parser.add_argument('--wait', action='store_true', help='Wait for cluster to be ready')
 
         command_subparser = self.parser.add_subparsers(dest='command')
         command_subparser.add_parser('list', help="List Nodes", parents=[opt_parser], add_help=False)
@@ -80,7 +83,7 @@ class CBCUtil(CLI):
         export_subparser.add_parser('json', help="Export JSON", parents=[opt_parser], add_help=False)
 
     def run(self):
-        logger.info("CBPerf version %s" % VERSION)
+        logger.info("CBCUtil version %s" % VERSION)
         config.process_params(self.options)
         if self.options.command == 'list':
             MainLoop().cluster_list()
@@ -89,9 +92,9 @@ class CBCUtil(CLI):
         elif self.options.command == 'clean':
             MainLoop().schema_remove()
         elif self.options.command == 'export':
-            if self.args.export_command == 'csv':
+            if self.options.export_command == 'csv':
                 CBExport().export(ExportType.csv)
-            elif self.args.export_command == 'json':
+            elif self.options.export_command == 'json':
                 CBExport().export(ExportType.json)
         elif self.options.command == 'import':
             PluginImport().import_tables()
