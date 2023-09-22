@@ -220,3 +220,9 @@ async def test_async_driver_3(hostname, bucket, tls, scope, collection):
         opk = await opm.connect(keyspace)
         count += await opk.get_count()
     assert count == 10000
+
+    opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls, quota=128, create=True)
+    opm = await opc.init()
+    keyspace = f"{bucket}.{scope}.{collection}"
+    col_a = await opm.connect(keyspace)
+    await col_a.cleanup()

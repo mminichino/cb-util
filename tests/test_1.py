@@ -267,3 +267,5 @@ def test_cb_driver_5(hostname, bucket, tls, scope, collection):
         keyspace = f"{bucket}.{scope}.{collection}{c}"
         count += CBOperation(hostname, "Administrator", "password", ssl=tls).connect(keyspace).get_count()
     assert count == 10000
+
+    CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
