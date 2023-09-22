@@ -10,7 +10,7 @@ import signal
 import inspect
 import traceback
 from cbcmgr.cli import constants as C
-from cbcmgr import get_config_file
+import cbcmgr.cli.config as config
 
 warnings.filterwarnings("ignore")
 logger = logging.getLogger()
@@ -86,13 +86,11 @@ class CLI(object):
 
     def __init__(self, args):
         signal.signal(signal.SIGINT, break_signal_handler)
-        default_debug_file = f"/var/log/{os.path.splitext(os.path.basename(sys.argv[0]))[0]}.log"
+        default_debug_file = os.path.join(config.home_dir, f"{os.path.splitext(os.path.basename(sys.argv[0]))[0]}.log")
         debug_file = os.environ.get("DEBUG_FILE", default_debug_file)
         self.args = args
         self.parser = None
         self.options = None
-        self.data_file = get_config_file("data.json")
-        self.schema_file = get_config_file("schema.json")
 
         if self.args is None:
             self.args = sys.argv

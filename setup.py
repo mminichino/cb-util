@@ -12,6 +12,12 @@ setup(
     license='MIT License',
     author='Michael Minichino',
     python_requires='>=3.8',
+    entry_points={
+        'console_scripts': [
+            'cbcutil = cbcmgr.cli.cbcutil:main',
+        ]
+    },
+    package_data={'cbcmgr': ['data/*']},
     install_requires=[
         "attrs>=22.2.0",
         "couchbase==4.1.5",

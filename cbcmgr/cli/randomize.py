@@ -1,7 +1,6 @@
 ##
 ##
 
-import os
 import warnings
 import json
 import multiprocessing
@@ -19,10 +18,9 @@ import hashlib
 from enum import Enum
 import numpy
 from PIL import Image
+from cbcmgr import get_config_file
 
 warnings.filterwarnings("ignore")
-lib_dir = os.path.dirname(os.path.realpath(__file__))
-package_dir = os.path.dirname(lib_dir)
 
 
 class HashMode(Enum):
@@ -97,7 +95,7 @@ class MPAtomicIncrement(object):
             return self.count.value
 
 
-data_file_name = package_dir + '/config/data.json'
+data_file_name = get_config_file('data.json')
 data_struct = {}
 issued_struct = {
     "ssn": {},

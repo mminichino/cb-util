@@ -1,4 +1,5 @@
-.PHONY:	setup push all
+.PHONY:	setup push all version test_cli
+export PYTHONPATH := $(shell pwd)/test:$(shell pwd):$(PYTHONPATH)
 
 version:
 		bumpversion patch
@@ -8,3 +9,5 @@ push:
 		$(eval REV_FILE := $(shell ls dist/*.gz | tail -1))
 		twine upload $(REV_FILE)
 all: setup push
+test_cli:
+		python -m pytest tests/test_3.py

@@ -2,6 +2,7 @@
 ##
 
 import attr
+from typing import List
 from attr.validators import instance_of as io
 
 
@@ -29,7 +30,7 @@ class Table(object):
     name = attr.ib(validator=io(str))
     size = attr.ib(validator=io(int))
     rows = attr.ib(validator=io(int))
-    columns = attr.ib(type=list[Column])
+    columns = attr.ib(type=List[Column])
 
     @classmethod
     def build(cls, name: str, size: int, rows: int):
@@ -51,7 +52,7 @@ class Table(object):
 
 @attr.s
 class Schema(object):
-    tables = attr.ib(type=list[Table])
+    tables = attr.ib(type=List[Table])
 
     @classmethod
     def build(cls):

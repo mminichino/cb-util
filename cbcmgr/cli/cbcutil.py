@@ -81,6 +81,7 @@ class CBCUtil(CLI):
 
     def run(self):
         logger.info("CBPerf version %s" % VERSION)
+        config.process_params(self.options)
         if self.options.command == 'list':
             MainLoop().cluster_list()
         elif self.options.command == 'schema':
@@ -95,7 +96,7 @@ class CBCUtil(CLI):
         elif self.options.command == 'import':
             PluginImport().import_tables()
         else:
-            if config.op_mode == OperatingMode.LOAD.value and self.args.schema:
+            if config.op_mode == OperatingMode.LOAD.value and self.options.schema:
                 MainLoop().schema_load()
             elif config.op_mode == OperatingMode.LOAD.value:
                 MainLoop().input_load()
