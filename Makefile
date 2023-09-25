@@ -26,5 +26,7 @@ test_random:
 		python -m pytest tests/test_4.py
 test_sgw_cli:
 		python -m pytest tests/test_5.py
+test_capella:
+		python -m pytest tests/test_6.py
 test:
 		python -m pytest tests/test_1.py tests/test_2.py tests/test_3.py tests/test_4.py tests/test_5.py

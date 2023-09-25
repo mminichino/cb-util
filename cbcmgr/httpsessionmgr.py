@@ -11,10 +11,16 @@ import datetime
 import hmac
 import hashlib
 import warnings
+from enum import Enum
 from urllib.parse import urlparse
 from requests.auth import AuthBase
-from .exceptions import (NotAuthorized, HTTPForbidden, HTTPNotImplemented, RequestValidationError, InternalServerError,
+from .exceptions import (NotAuthorized, HTTPForbidden, HTTPNotImplemented, RequestValidationError, InternalServerError, APIError,
                          PaginationDataNotFound, SyncGatewayOperationException, PreconditionFailed, ConflictException)
+
+
+class AuthType(Enum):
+    basic = 0
+    capella = 1
 
 
 class CapellaToken(object):
@@ -60,19 +66,31 @@ class CapellaToken(object):
 class CapellaAuth(AuthBase):
 
     def __init__(self):
-        if 'CBC_ACCESS_KEY' in os.environ:
-            self.capella_key = os.environ['CBC_ACCESS_KEY']
-        else:
-            raise Exception("Please set CBC_ACCESS_KEY for Capella API access")
+        _credential_file = os.path.join(os.environ['HOME'], '.capella', 'default-api-key-token.txt')
+        _profile_token = None
+        self.profile_token = None
 
-        if 'CBC_SECRET_KEY' in os.environ:
-            self.capella_secret = os.environ['CBC_SECRET_KEY']
+        if os.path.exists(_credential_file):
+            try:
+                credential_data = dict(line.split(':', 1) for line in open(_credential_file))
+                _profile_token = credential_data.get('APIKeyToken')
+                if _profile_token:
+                    _profile_token = _profile_token.strip()
+            except Exception as err:
+                raise Exception(f"can not read credential file {_credential_file}: {err}")
+
+        if 'CAPELLA_TOKEN' in os.environ:
+            self.profile_token = os.environ['CAPELLA_TOKEN']
+        elif _profile_token:
+            self.profile_token = _profile_token
         else:
-            raise Exception("Please set CBC_SECRET_KEY for Capella API access")
+            raise Exception("Please set Capella Token for Capella API access (for example in $HOME/.capella/default-api-key-token.txt)")
 
     def __call__(self, r):
-        cbc_api_request_headers = CapellaToken(self.capella_key, self.capella_secret).signature(r.method, r.url).token
-        r.headers.update(cbc_api_request_headers)
+        request_headers = {
+            "Authorization": f"Bearer {self.profile_token}",
+        }
+        r.headers.update(request_headers)
         return r
 
 
@@ -99,7 +117,7 @@ class APISession(object):
     AUTH_BASIC = 0
     AUTH_CAPELLA = 1
 
-    def __init__(self, username=None, password=None, auth_type=0):
+    def __init__(self, username=None, password=None, auth_type=AuthType.basic):
         warnings.filterwarnings("ignore")
         self.username = username
         self.password = password
@@ -112,7 +130,7 @@ class APISession(object):
         self.session.mount('http://', HTTPAdapter(max_retries=retries))
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
         self._response = None
-        if auth_type == 0:
+        if auth_type == AuthType.basic:
             self.auth_class = BasicAuth(self.username, self.password)
         else:
             self.auth_class = CapellaAuth()
@@ -139,7 +157,7 @@ class APISession(object):
 
     def check_status_code(self, code):
         self.logger.debug("API status code {}".format(code))
-        if code == 200 or code == 201:
+        if code == 200 or code == 201 or code == 202:
             return True
         elif code == 401:
             raise NotAuthorized("API: Unauthorized")
@@ -212,10 +230,7 @@ class APISession(object):
     def capella_pagination(response_json):
         if "cursor" in response_json:
             if "pages" in response_json["cursor"]:
-                if "items" in response_json["data"]:
-                    data = response_json["data"]["items"]
-                else:
-                    data = response_json["data"]
+                data = response_json["data"]
                 if "next" in response_json["cursor"]["pages"]:
                     next_page = response_json["cursor"]["pages"]["next"]
                     per_page = response_json["cursor"]["pages"]["perPage"]
@@ -258,8 +273,8 @@ class APISession(object):
 
         try:
             self.check_status_code(response.status_code)
-        except Exception:
-            raise
+        except Exception as err:
+            raise APIError(err, response.text)
 
         self._response = response.text
         return self
