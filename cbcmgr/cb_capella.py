@@ -19,6 +19,33 @@ logger = logging.getLogger('cbcmgr.capella')
 logger.addHandler(logging.NullHandler())
 
 
+aws_storage_matrix = {
+    99: 3000,
+    199: 5000,
+    299: 6000,
+    399: 8000,
+    499: 9000,
+    599: 10000,
+    699: 12000,
+    799: 13000,
+    899: 14000,
+    999: 16000,
+    16384: 16000
+}
+
+
+azure_storage_matrix = {
+    64: "P6",
+    128: "P10",
+    256: "P15",
+    512: "P20",
+    1024: "P30",
+    2048: "P40",
+    4096: "P50",
+    8192: "P60"
+}
+
+
 class NodeAvailability(str, Enum):
     single = 'single'
     multi = 'multi'
@@ -35,6 +62,34 @@ class SupportTZ(str, Enum):
     emea = 'GMT'
     asia = 'IST'
     western_us = 'PT'
+
+
+class BucketType(str, Enum):
+    couchbase = 'couchbase'
+    ephemeral = 'ephemeral'
+
+
+class BucketBackend(str, Enum):
+    couchstore = 'couchstore'
+    magma = 'magma'
+
+
+class BucketResolution(str, Enum):
+    seqno = 'seqno'
+    lww = 'lww'
+
+
+class BucketDurability(str, Enum):
+    none = 'none'
+    majority = 'majority'
+    majorityAndPersistActive = 'majorityAndPersistActive'
+    persistToMajority = 'persistToMajority'
+
+
+class BucketEviction(str, Enum):
+    fullEviction = 'fullEviction'
+    noEviction = 'noEviction'
+    nruEviction = 'nruEviction'
 
 
 @attr.s
@@ -90,6 +145,108 @@ class CapellaCluster:
     availability: Optional[Availability] = attr.ib(default=None)
     support: Optional[Support] = attr.ib(default=None)
 
+    @classmethod
+    def create(cls, name, description, cloud, region, availability=NodeAvailability.multi, plan=SupportPlan.devpro, timezone=SupportTZ.western_us):
+        return cls(
+            name,
+            description,
+            CloudProvider(
+                cloud,
+                region
+            ),
+            [],
+            Availability(availability),
+            Support(plan, timezone)
+        )
+
+    def add_service_group(self, cloud, machine_type, storage=256, quantity=3, services=None):
+        if not services:
+            services = ["data", "index", "query"]
+        cpu, memory = machine_type.split('x')
+        if cloud == "aws":
+            size = storage
+            iops = next((aws_storage_matrix[s] for s in aws_storage_matrix if s >= storage), None)
+            s_type = "gp3"
+        elif cloud == "azure":
+            size, s_type = next(((s, azure_storage_matrix[s]) for s in azure_storage_matrix if s >= storage), None)
+            iops = None
+        else:
+            size = storage
+            s_type = None
+            iops = None
+        self.serviceGroups.append(
+            ServiceGroup(
+                NodeConfig(
+                    ComputeConfig(int(cpu), int(memory)),
+                    StorageConfig(size, s_type, iops)
+                ),
+                quantity,
+                services
+            )
+        )
+
+
+@attr.s
+class AllowedCIDR:
+    cidr: Optional[str] = attr.ib(default='0.0.0.0/0')
+
+    @classmethod
+    def create(cls, cidr='0.0.0.0/0'):
+        return cls(
+            cidr
+        )
+
+
+@attr.s
+class UserAccess:
+    privileges: Optional[List[str]] = attr.ib(default=["read", "write"])
+
+
+@attr.s
+class Credentials:
+    name: Optional[str] = attr.ib(default='sysdba')
+    password: Optional[str] = attr.ib(default=None)
+    access: Optional[List[UserAccess]] = attr.ib(default=None)
+
+    @classmethod
+    def create(cls, username, password):
+        return cls(
+            username,
+            password,
+            [
+                UserAccess()
+            ]
+        )
+
+
+@attr.s
+class Bucket:
+    name: Optional[str] = attr.ib(default=None)
+    type: Optional[str] = attr.ib(default=None)
+    storageBackend: Optional[str] = attr.ib(default=None)
+    memoryAllocationInMb: Optional[str] = attr.ib(default=None)
+    bucketConflictResolution: Optional[BucketResolution] = attr.ib(default=None)
+    durabilityLevel: Optional[BucketDurability] = attr.ib(default=None)
+    replicas: Optional[int] = attr.ib(default=None)
+    flush: Optional[bool] = attr.ib(default=None)
+    timeToLiveInSeconds: Optional[int] = attr.ib(default=None)
+    evictionPolicy: Optional[BucketEviction] = attr.ib(default=None)
+
+    @classmethod
+    def create(cls, name, quota, replicas=1, ttl=0, bucket_type=BucketType.couchbase, backend=BucketBackend.couchstore):
+        return cls(
+            name,
+            bucket_type,
+            backend,
+            quota,
+            BucketResolution.seqno,
+            BucketDurability.none,
+            replicas,
+            False,
+            ttl,
+            BucketEviction.fullEviction
+        )
+
 
 class NetworkDriver(object):
 
@@ -117,9 +274,9 @@ class NetworkDriver(object):
             for n, candidate in enumerate(candidates):
                 try:
                     if network.prefixlen < 16:
-                        result = list(network.address_exclude(candidate))
+                        list(network.address_exclude(candidate))
                     else:
-                        result = list(candidate.address_exclude(network))
+                        list(candidate.address_exclude(network))
                 except ValueError:
                     available.append(candidate)
             candidates = available
@@ -188,6 +345,10 @@ class Capella(APISession):
         subnet_list = list(cidr_util.get_next_subnet(prefix=23))
         subnet_cycle = cycle(subnet_list)
 
+        response = self.get_cluster(cluster.name)
+        if response:
+            return response.get('id')
+
         while True:
             try:
                 results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters", body=parameters).json()
@@ -202,7 +363,7 @@ class Capella(APISession):
                     parameters = attrs.asdict(cluster)
                     logger.debug(f"Trying new CIDR {network_cidr}")
                 else:
-                    raise CapellaError(f"Can not create Capella database: {err}")
+                    raise CapellaError(f"Can not create Capella database: {err} message: {err.body.get('message', '')}")
 
     def wait_cluster(self, name, retry_count=120):
         for retry_number in range(retry_count + 1):
@@ -214,3 +375,64 @@ class Capella(APISession):
                     return False
                 logger.info(f"Waiting for cluster {name} to deploy")
                 time.sleep(5)
+
+    def get_allowed_cidr(self, cluster_id: str, cidr: str):
+        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/allowedcidrs").json()
+
+        return next((c for c in results if c.get('cidr') == cidr), None)
+
+    def allow_cidr(self, cluster_id: str, cidr: AllowedCIDR):
+        response = self.get_allowed_cidr(cluster_id, cidr.cidr)
+        if response:
+            return response.get('id')
+
+        # noinspection PyTypeChecker
+        parameters = attrs.asdict(cidr)
+
+        try:
+            results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/allowedcidrs", body=parameters).json()
+            return results.get('id')
+        except APIError as err:
+            raise CapellaError(f"Can not add database allowed CIDR: {err} message: {err.body.get('message', '')}")
+
+    def get_db_user(self, cluster_id: str, username: str):
+        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users").json()
+
+        return next((c for c in results if c.get('name') == username), None)
+
+    def add_db_user(self, cluster_id: str, credentials: Credentials):
+        response = self.get_db_user(cluster_id, credentials.name)
+        if response:
+            return response.get('id')
+
+        # noinspection PyTypeChecker
+        parameters = attrs.asdict(credentials)
+
+        try:
+            results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users", body=parameters).json()
+            return results.get('id')
+        except APIError as err:
+            raise CapellaError(f"Can not add database user: {err} message: {err.body.get('message', '')}")
+
+    def get_bucket(self, cluster_id: str, bucket: str):
+        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets").json()
+
+        return next((c for c in results if c.get('name') == bucket), None)
+
+    def add_bucket(self, cluster_id: str, bucket: Bucket):
+        response = self.get_bucket(cluster_id, bucket.name)
+        if response:
+            return response.get('id')
+
+        # noinspection PyTypeChecker
+        parameters = attrs.asdict(bucket)
+
+        try:
+            results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets", body=parameters).json()
+            return results.get('id')
+        except APIError as err:
+            raise CapellaError(f"Can not add bucket: {err} message: {err.body.get('message', '')}")
+
+    def delete_bucket(self, cluster_id: str, bucket_id: str):
+        results = self.api_delete(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets/{bucket_id}")
+        return results

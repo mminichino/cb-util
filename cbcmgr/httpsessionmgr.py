@@ -157,7 +157,7 @@ class APISession(object):
 
     def check_status_code(self, code):
         self.logger.debug("API status code {}".format(code))
-        if code == 200 or code == 201 or code == 202:
+        if code == 200 or code == 201 or code == 202 or code == 204:
             return True
         elif code == 401:
             raise NotAuthorized("API: Unauthorized")
