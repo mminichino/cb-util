@@ -74,18 +74,25 @@ class CBManager(CBConnect):
     def create_bucket(self, name, quota: int = 256, replicas: int = 0):
         if not name:
             raise BucketCreateException(f"bucket name can not be null")
+
         self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
-        logger.debug(f"create_bucket: create bucket {name}")
-        try:
-            bm = self._cluster.buckets()
-            bm.create_bucket(CreateBucketSettings(name=name,
-                                                  bucket_type=BucketType.COUCHBASE,
-                                                  storage_backend=StorageBackend.COUCHSTORE,
-                                                  num_replicas=replicas,
-                                                  ram_quota_mb=quota),
-                             CreateBucketOptions(timeout=timedelta(seconds=25)))
-        except BucketAlreadyExistsException:
-            pass
+
+        result = self.get_bucket(name)
+        if result:
+            logger.debug(f"create_bucket: bucket {name} already exists")
+        else:
+            logger.debug(f"create_bucket: create bucket {name}")
+            try:
+                bm = self._cluster.buckets()
+                bm.create_bucket(CreateBucketSettings(name=name,
+                                                      bucket_type=BucketType.COUCHBASE,
+                                                      storage_backend=StorageBackend.COUCHSTORE,
+                                                      num_replicas=replicas,
+                                                      ram_quota_mb=quota),
+                                 CreateBucketOptions(timeout=timedelta(seconds=25)))
+            except BucketAlreadyExistsException:
+                pass
+
         self.bucket(name)
 
     def drop_bucket(self, name):

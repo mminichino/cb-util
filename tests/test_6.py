@@ -8,8 +8,8 @@ warnings.filterwarnings("ignore")
 
 
 def test_capella_1():
-    result = Capella().list_projects()
-    project_id = result.get('pytest-project')
+    project = Capella().get_project('pytest-project')
+    project_id = project.get('id')
 
     assert project_id is not None
 
