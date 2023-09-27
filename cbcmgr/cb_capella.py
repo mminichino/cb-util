@@ -308,7 +308,7 @@ class Capella(APISession):
         if not self.organization_id:
             orgs = self.list_organizations()
             try:
-                self.organization_id = orgs[0]
+                self.organization_id = orgs[0].get('id')
             except IndexError:
                 raise CapellaError("please provide an organization ID (unable to automatically determine default ID")
 
@@ -316,14 +316,23 @@ class Capella(APISession):
         organizations = []
         results = self.api_get(f"/v4/organizations").json()
         for entry in results.get('data', []):
-            organizations.append(entry.get('id'))
+            organizations.append(entry)
         return organizations
+
+    def get_organization(self, name: str):
+        results = self.api_get(f"/v4/organizations").json()
+
+        return next((o for o in results.get('data', []) if o.get('name') == name), None)
 
     def list_projects(self):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects").json()
 
-        projects = dict((i.get('name'), i.get('id')) for i in results)
-        return projects
+        return results
+
+    def get_project(self, name: str):
+        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects").json()
+
+        return next((p for p in results if p.get('name') == name), None)
 
     def list_clusters(self):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters").json()
@@ -398,7 +407,7 @@ class Capella(APISession):
     def get_db_user(self, cluster_id: str, username: str):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users").json()
 
-        return next((c for c in results if c.get('name') == username), None)
+        return next((u for u in results if u.get('name') == username), None)
 
     def add_db_user(self, cluster_id: str, credentials: Credentials):
         response = self.get_db_user(cluster_id, credentials.name)
@@ -417,7 +426,7 @@ class Capella(APISession):
     def get_bucket(self, cluster_id: str, bucket: str):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets").json()
 
-        return next((c for c in results if c.get('name') == bucket), None)
+        return next((b for b in results if b.get('name') == bucket), None)
 
     def add_bucket(self, cluster_id: str, bucket: Bucket):
         response = self.get_bucket(cluster_id, bucket.name)
