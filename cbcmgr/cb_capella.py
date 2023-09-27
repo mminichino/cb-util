@@ -10,6 +10,8 @@ from typing import Optional, List, Union
 from enum import Enum
 import attrs
 import ipaddress
+import string
+import random
 from itertools import cycle
 from ipaddress import IPv4Network
 from cbcmgr.httpsessionmgr import APISession, AuthType
@@ -146,13 +148,14 @@ class CapellaCluster:
     support: Optional[Support] = attr.ib(default=None)
 
     @classmethod
-    def create(cls, name, description, cloud, region, availability=NodeAvailability.multi, plan=SupportPlan.devpro, timezone=SupportTZ.western_us):
+    def create(cls, name, description, cloud, region, cidr='10.0.0.0/23', availability=NodeAvailability.multi, plan=SupportPlan.devpro, timezone=SupportTZ.western_us):
         return cls(
             name,
             description,
             CloudProvider(
                 cloud,
-                region
+                region,
+                cidr
             ),
             [],
             Availability(availability),
@@ -340,6 +343,30 @@ class Capella(APISession):
                 self.organization_id = orgs[0].get('id')
             except IndexError:
                 raise CapellaError("please provide an organization ID (unable to automatically determine default ID")
+
+    @staticmethod
+    def valid_password(password: str):
+        m = 0
+        if len(password) >= 8:
+            for i in password:
+                if i.islower():
+                    m += 1
+                if i.isupper():
+                    m += 1
+                if i.isdigit():
+                    m += 1
+
+        if m >= 3:
+            return True
+        else:
+            return False
+
+    def generate_password(self):
+        while True:
+            text = ''.join(random.choices(string.ascii_lowercase + string.ascii_uppercase + string.digits, k=7))
+            password = f"{str(text)}#"
+            if self.valid_password(password):
+                return password
 
     def list_organizations(self):
         organizations = []
