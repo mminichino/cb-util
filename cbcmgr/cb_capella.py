@@ -1,6 +1,6 @@
 ##
 ##
-import json
+
 import logging
 import attr
 import os
@@ -403,16 +403,34 @@ class Capella(APISession):
                 else:
                     raise CapellaError(f"Can not create Capella database: {err} message: {err.body.get('message', '')}")
 
-    def wait_cluster(self, name, retry_count=120):
+    def wait_for_cluster(self, name, retry_count=120, state="healthy"):
         for retry_number in range(retry_count + 1):
             cluster = self.get_cluster(name)
-            if cluster.get('currentState') == 'healthy':
+            if cluster and cluster.get('currentState') == state:
                 return True
             else:
                 if retry_number == retry_count:
                     return False
-                logger.info(f"Waiting for cluster {name} to deploy")
+                logger.debug(f"Waiting for cluster {name} to reach state {state}")
                 time.sleep(5)
+
+    def wait_for_cluster_delete(self, name, retry_count=120):
+        for retry_number in range(retry_count + 1):
+            cluster = self.get_cluster(name)
+            if cluster and cluster.get('currentState') == 'destroying':
+                if retry_number == retry_count:
+                    return False
+                logger.debug(f"Waiting for cluster {name} to delete")
+                time.sleep(5)
+            else:
+                return True
+
+    def delete_cluster(self, cluster_name: str):
+        cluster = self.get_cluster(cluster_name)
+        if cluster:
+            cluster_id = cluster.get('id')
+            results = self.api_delete(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}")
+            return results
 
     def get_allowed_cidr(self, cluster_id: str, cidr: str):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/allowedcidrs").json()
@@ -471,6 +489,12 @@ class Capella(APISession):
         except APIError as err:
             raise CapellaError(f"Can not add bucket: {err} message: {err.body.get('message', '')}")
 
-    def delete_bucket(self, cluster_id: str, bucket_id: str):
-        results = self.api_delete(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets/{bucket_id}")
-        return results
+    def delete_bucket(self, cluster_name: str, bucket_name: str):
+        cluster = self.get_cluster(cluster_name)
+        if cluster:
+            cluster_id = cluster.get('id')
+            bucket = self.get_bucket(cluster_id, bucket_name)
+            if bucket:
+                bucket_id = bucket.get('id')
+                results = self.api_delete(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets/{bucket_id}")
+                return results
