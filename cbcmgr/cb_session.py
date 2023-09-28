@@ -30,7 +30,7 @@ class BucketMode(Enum):
 
 class CBSession(object):
 
-    def __init__(self, hostname: str, username: str, password: str, ssl=False, external=False, kv_timeout: int = 5, query_timeout: int = 60):
+    def __init__(self, hostname: str, username: str, password: str, ssl=False, project=None, database=None, external=False, kv_timeout: int = 5, query_timeout: int = 60):
         self.cluster_node_count = None
         self._cluster = None
         self._bucket = None
@@ -44,7 +44,12 @@ class CBSession(object):
         self.hostname = hostname
         self.username = username
         self.password = password
-        self.ssl = ssl
+        self.capella_project = project
+        self.capella_db = database
+        if self.capella_db:
+            self.ssl = True
+        else:
+            self.ssl = ssl
         self.rally_host_name = hostname
         self.rally_cluster_node = self.rally_host_name
         self.rally_dns_domain = False

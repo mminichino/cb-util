@@ -48,6 +48,8 @@ bucket_name = None
 scope_name = None
 collection_name = None
 document_key = None
+capella_project = None
+capella_db = None
 insert_data = None
 wait_mode = False
 ping_mode = False
@@ -85,6 +87,8 @@ def process_params(parameters: argparse.Namespace) -> None:
         scope_name, \
         collection_name, \
         document_key, \
+        capella_project, \
+        capella_db, \
         insert_data, \
         wait_mode, \
         ping_mode, \
@@ -128,6 +132,10 @@ def process_params(parameters: argparse.Namespace) -> None:
         collection_name = parameters.collection
     if parameters.key:
         document_key = parameters.key
+    if parameters.project:
+        capella_project = parameters.project
+    if parameters.db:
+        capella_db = parameters.db
     if parameters.data:
         insert_data = parameters.data
     if parameters.quiet:

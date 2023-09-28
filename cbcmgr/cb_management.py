@@ -8,6 +8,7 @@ from .retry import retry, retry_inline
 from .cb_connect import CBConnect
 from .util import r_getattr, omit_path, copy_path
 from .config import UpsertMapConfig, MapUpsertType
+from .cb_capella import Capella, Bucket
 from datetime import timedelta
 import attr
 import hashlib
@@ -82,16 +83,29 @@ class CBManager(CBConnect):
             logger.debug(f"create_bucket: bucket {name} already exists")
         else:
             logger.debug(f"create_bucket: create bucket {name}")
-            try:
-                bm = self._cluster.buckets()
-                bm.create_bucket(CreateBucketSettings(name=name,
-                                                      bucket_type=BucketType.COUCHBASE,
-                                                      storage_backend=StorageBackend.COUCHSTORE,
-                                                      num_replicas=replicas,
-                                                      ram_quota_mb=quota),
-                                 CreateBucketOptions(timeout=timedelta(seconds=25)))
-            except BucketAlreadyExistsException:
-                pass
+            if self.capella_project and self.capella_db:
+                project = Capella().get_project(self.capella_project)
+                if not project:
+                    raise BucketCreateException(f"Can not lookup Capella project {self.capella_project}")
+                project_id = project.get('id')
+                bucket = Bucket().create(name, quota, replicas, 0)
+                cluster = Capella(project_id=project_id).get_cluster(self.capella_db)
+                if not cluster:
+                    raise BucketCreateException(f"Can not find Capella database {self.capella_db}")
+                cluster_id = cluster.get('id')
+                logger.debug(f"Creating Capella bucket {name} in project {project_id} database {cluster_id}")
+                Capella(project_id=project_id).add_bucket(cluster_id, bucket)
+            else:
+                try:
+                    bm = self._cluster.buckets()
+                    bm.create_bucket(CreateBucketSettings(name=name,
+                                                          bucket_type=BucketType.COUCHBASE,
+                                                          storage_backend=StorageBackend.COUCHSTORE,
+                                                          num_replicas=replicas,
+                                                          ram_quota_mb=quota),
+                                     CreateBucketOptions(timeout=timedelta(seconds=25)))
+                except BucketAlreadyExistsException:
+                    pass
 
         self.bucket(name)
 

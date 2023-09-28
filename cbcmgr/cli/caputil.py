@@ -7,7 +7,7 @@ from overrides import override
 from cbcmgr import VERSION
 from cbcmgr.cli.cli import CLI
 from cbcmgr.cli.exceptions import *
-from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials
+from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials, Bucket
 import pandas as pd
 
 warnings.filterwarnings("ignore")
@@ -24,6 +24,7 @@ class CapellaCLI(CLI):
         opt_parser = argparse.ArgumentParser(parents=[self.parser], add_help=False)
         opt_parser.add_argument('-n', '--name', action='store', help="Object Name")
         opt_parser.add_argument('-p', '--project', action='store', help="Project Name")
+        opt_parser.add_argument('-d', '--db', action='store', help="Database for bucket operations")
         opt_parser.add_argument('-a', '--allow', action='store', help="Allow CIDR", default="0.0.0.0/0")
         opt_parser.add_argument('-c', '--cidr', action='store', help="Cluster CIDR", default="10.0.0.0/23")
         opt_parser.add_argument('-m', '--machine', action='store', help="Machine type", default="4x16")
@@ -31,6 +32,9 @@ class CapellaCLI(CLI):
         opt_parser.add_argument('-P', '--password', action='store', help="User Password")
         opt_parser.add_argument('-C', '--cloud', action='store', help="Cluster cloud", default="aws")
         opt_parser.add_argument('-R', '--region', action='store', help="Cloud region", default="us-east-1")
+        opt_parser.add_argument('-r', '--replicas', action='store', help="Bucket replicas", default=1, type=int)
+        opt_parser.add_argument('-q', '--quota', action='store', help="Bucket quota", default=128, type=int)
+        opt_parser.add_argument('-t', '--ttl', action='store', help="Bucket TTL", default=0, type=int)
 
         command_subparser = self.parser.add_subparsers(dest='command')
         cluster_parser = command_subparser.add_parser('cluster', help="Cluster Operations", parents=[opt_parser], add_help=False)
@@ -38,6 +42,7 @@ class CapellaCLI(CLI):
         cluster_subparser.add_parser('get', help="Get cluster info", parents=[opt_parser], add_help=False)
         cluster_subparser.add_parser('list', help="List clusters", parents=[opt_parser], add_help=False)
         cluster_subparser.add_parser('create', help="Create clusters", parents=[opt_parser], add_help=False)
+        cluster_subparser.add_parser('delete', help="Delete clusters", parents=[opt_parser], add_help=False)
         project_parser = command_subparser.add_parser('project', help="Cluster Operations", parents=[opt_parser], add_help=False)
         project_subparser = project_parser.add_subparsers(dest='project_command')
         project_subparser.add_parser('get', help="Get project info", parents=[opt_parser], add_help=False)
@@ -46,6 +51,11 @@ class CapellaCLI(CLI):
         org_subparser = org_parser.add_subparsers(dest='org_command')
         org_subparser.add_parser('get', help="Get organization info", parents=[opt_parser], add_help=False)
         org_subparser.add_parser('list', help="List organizations", parents=[opt_parser], add_help=False)
+        bucket_parser = command_subparser.add_parser('bucket', help="Bucket Operations", parents=[opt_parser], add_help=False)
+        bucket_subparser = bucket_parser.add_subparsers(dest='bucket_command')
+        bucket_subparser.add_parser('create', help="Create bucket", parents=[opt_parser], add_help=False)
+        bucket_subparser.add_parser('delete', help="Delete bucket", parents=[opt_parser], add_help=False)
+        bucket_subparser.add_parser('list', help="List buckets", parents=[opt_parser], add_help=False)
 
     def create_cluster(self, project_id: str):
         cluster_name = self.options.name
@@ -83,20 +93,52 @@ class CapellaCLI(CLI):
         Capella(project_id=project_id).add_db_user(cluster_id, credentials)
         logger.info("Done")
 
+    def delete_cluster(self, project_id: str):
+        cluster_name = self.options.name
+
+        logger.info(f"Destroying cluster {cluster_name}")
+        Capella(project_id=project_id).delete_cluster(cluster_name)
+        logger.info("Waiting for cluster deletion to complete")
+        Capella(project_id=project_id).wait_for_cluster_delete(cluster_name)
+
+    def create_bucket(self, project_id: str):
+        database = self.options.db
+        bucket_name = self.options.name
+        bucket_quota = self.options.quota
+        bucket_replicas = self.options.replicas
+        bucket_ttl = self.options.ttl
+        bucket = Bucket().create(bucket_name, bucket_quota, bucket_replicas, bucket_ttl)
+
+        cluster = Capella(project_id=project_id).get_cluster(database)
+        if cluster:
+            cluster_id = cluster.get('id')
+            logger.info(f"Creating bucket {bucket_name}")
+            Capella(project_id=project_id).add_bucket(cluster_id, bucket)
+
+    def delete_bucket(self, project_id: str):
+        database = self.options.db
+        bucket_name = self.options.name
+        logger.info(f"Deleting bucket {bucket_name}")
+        Capella(project_id=project_id).delete_bucket(database, bucket_name)
+
     def run(self):
         logger.info("CapUtil version %s" % VERSION)
+        cm = Capella()
+        project = cm.get_project(self.options.project)
+        project_id = None
+        if project:
+            project_id = project.get('id')
 
         if self.options.command == 'cluster':
-            cm = Capella()
-            project = cm.get_project(self.options.project)
-            if project:
-                project_id = project.get('id')
-            else:
+            if not project_id:
                 logger.error(f"Can not find project {self.options.project}")
                 return
 
             if self.options.cluster_command == "create":
                 self.create_cluster(project_id)
+                return
+            elif self.options.cluster_command == "delete":
+                self.delete_cluster(project_id)
                 return
 
             pm = Capella(project_id=project_id)
@@ -118,8 +160,32 @@ class CapellaCLI(CLI):
                     print(result)
             elif self.options.cluster_command == "list":
                 print(pd.DataFrame(subset_df).to_string())
+        elif self.options.command == 'bucket':
+            if not project_id:
+                logger.error(f"Can not find project {self.options.project}")
+                return
+
+            if self.options.bucket_command == "create":
+                self.create_bucket(project_id)
+                return
+            elif self.options.bucket_command == "delete":
+                self.delete_bucket(project_id)
+                return
+
+            cluster = Capella(project_id=project_id).get_cluster(self.options.db)
+            if cluster:
+                cluster_id = cluster.get('id')
+                data = cm.list_buckets(cluster_id)
+                df = pd.json_normalize(data)
+                subset_df = df
+
+                if self.options.bucket_command == "get":
+                    result = pd.DataFrame(subset_df[(subset_df.name == self.options.name)])
+                    if not result.empty:
+                        print(result)
+                elif self.options.bucket_command == "list":
+                    print(pd.DataFrame(subset_df).to_string())
         elif self.options.command == 'project':
-            cm = Capella()
             data = cm.list_projects()
             df = pd.json_normalize(data)
             subset_df = df[["id", "name", "audit.createdAt", "description"]]
@@ -131,7 +197,6 @@ class CapellaCLI(CLI):
             elif self.options.project_command == "list":
                 print(pd.DataFrame(subset_df).to_string())
         elif self.options.command == 'org':
-            cm = Capella()
             data = cm.list_organizations()
             df = pd.json_normalize(data)
             subset_df = df[["id", "name", "audit.createdAt", "preferences.sessionDuration"]]

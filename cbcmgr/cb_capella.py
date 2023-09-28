@@ -1,6 +1,7 @@
 ##
 ##
 
+import json
 import logging
 import attr
 import os
@@ -414,6 +415,9 @@ class Capella(APISession):
         if response:
             return response.get('id')
 
+        logger.debug(f"create_cluster: \n{json.dumps(parameters, indent=2)}")
+        logger.debug(f"create_cluster: org_id = {self.organization_id} project_id = {self.project_id}")
+
         while True:
             try:
                 results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters", body=parameters).json()
@@ -471,6 +475,8 @@ class Capella(APISession):
 
         # noinspection PyTypeChecker
         parameters = attrs.asdict(cidr)
+        logger.debug(f"allow_cidr: \n{json.dumps(parameters, indent=2)}")
+        logger.debug(f"allow_cidr: org_id = {self.organization_id} project_id = {self.project_id} cluster_id = {cluster_id}")
 
         try:
             results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/allowedcidrs", body=parameters).json()
@@ -490,6 +496,8 @@ class Capella(APISession):
 
         # noinspection PyTypeChecker
         parameters = attrs.asdict(credentials)
+        logger.debug(f"add_db_user: \n{json.dumps(parameters, indent=2)}")
+        logger.debug(f"add_db_user: org_id = {self.organization_id} project_id = {self.project_id} cluster_id = {cluster_id}")
 
         try:
             results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users", body=parameters).json()
@@ -502,6 +510,11 @@ class Capella(APISession):
 
         return next((b for b in results.get('data', []) if b.get('name') == bucket), None)
 
+    def list_buckets(self, cluster_id: str):
+        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets").json()
+
+        return results
+
     def add_bucket(self, cluster_id: str, bucket: Bucket):
         response = self.get_bucket(cluster_id, bucket.name)
         if response:
@@ -509,6 +522,8 @@ class Capella(APISession):
 
         # noinspection PyTypeChecker
         parameters = attrs.asdict(bucket)
+        logger.debug(f"add_bucket: \n{json.dumps(parameters, indent=2)}")
+        logger.debug(f"add_bucket: org_id = {self.organization_id} project_id = {self.project_id} cluster_id = {cluster_id}")
 
         try:
             results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets", body=parameters).json()

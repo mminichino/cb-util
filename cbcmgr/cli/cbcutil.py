@@ -54,6 +54,8 @@ class CBCUtil(CLI):
         opt_parser.add_argument('-O', '--stdout', action='store_true', help="Output to terminal")
         opt_parser.add_argument('-P', '--plugin', action='store', help="Export Plugin")
         opt_parser.add_argument('-V', '--variable', action='append', help="Plugin Variables")
+        opt_parser.add_argument('--project', action='store', help="Capella project")
+        opt_parser.add_argument('--db', action='store', help="Capella database")
         opt_parser.add_argument('--docid', action='store', help="Import document ID field", default="doc_id")
         opt_parser.add_argument('--tls', action='store_true', help="Enable SSL")
         opt_parser.add_argument('--safe', action='store_true', help="Do not overwrite data")
