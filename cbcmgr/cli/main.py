@@ -29,7 +29,7 @@ class MainLoop(object):
 
     @staticmethod
     def prep_bucket(bucket, scope, collection, quota: int = 256):
-        dbm = CBManager(config.host, config.username, config.password, ssl=config.tls).connect()
+        dbm = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db).connect()
         dbm.create_bucket(bucket, quota)
         dbm.create_scope(scope)
         dbm.create_collection(collection)
