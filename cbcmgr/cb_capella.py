@@ -204,33 +204,8 @@ class AllowedCIDR:
 @attr.s
 class UserAccess:
     privileges: Optional[List[str]] = attr.ib(default=[
-        "data_reader",
-        "data_dcp_reader",
-        "data_monitoring",
-        "fts_searcher",
-        "query_select",
-        "analytics_reader",
-        "query_execute_global_functions",
-        "query_execute_global_external_functions",
-        "analytics_select",
-        "external_stats_reader",
-        "query_execute_functions",
-        "query_execute_external_functions",
-        "external_stats_reader",
-        "data_writer",
-        "fts_admin",
-        "query_insert",
-        "query_update",
-        "query_delete",
-        "query_manage_index",
-        "replication_target",
-        "analytics_admin",
-        "query_manage_global_functions",
-        "query_manage_global_external_functions",
-        "analytics_manager",
-        "scope_admin",
-        "query_manage_functions",
-        "query_manage_external_functions",
+        "read",
+        "write",
     ]
     )
 
