@@ -118,21 +118,21 @@ xml_data = """<?xml version="1.0" encoding="UTF-8" ?>
 
 @pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
 @pytest.mark.parametrize("tls", [False, True])
-def test_cb_driver_1(hostname, bucket_name, tls, scope, collection):
+def test_cb_driver_1(hostname, bucket, tls, scope, collection):
     replica_count = 0
-    bucket = Bucket(**dict(
-        name=bucket_name,
+    bucket_opts = Bucket(**dict(
+        name=bucket,
         num_replicas=0
     ))
 
     dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
-    dbm.create_bucket(bucket)
+    dbm.create_bucket(bucket_opts)
     dbm.create_scope(scope)
     dbm.create_collection(collection)
-    result = dbm.get_bucket(bucket_name)
+    result = dbm.get_bucket(bucket)
     assert result is not None
 
-    dbc = CBConnect(hostname, "Administrator", "password", ssl=False).connect(bucket_name, scope, collection)
+    dbc = CBConnect(hostname, "Administrator", "password", ssl=False).connect(bucket, scope, collection)
 
     dbm.cb_create_primary_index(replica=replica_count)
     index_name = dbm.cb_create_index(fields=["data"], replica=replica_count)
@@ -143,7 +143,7 @@ def test_cb_driver_1(hostname, bucket_name, tls, scope, collection):
     result = dbm.is_index(index_name)
     assert result is True
     dbc.cb_upsert("test::1", document)
-    dbc.bucket_wait(bucket_name, count=1)
+    dbc.bucket_wait(bucket, count=1)
     result = dbc.cb_doc_exists("test::1")
     assert result is True
 
