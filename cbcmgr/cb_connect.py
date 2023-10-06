@@ -2,7 +2,7 @@
 ##
 
 from __future__ import annotations
-from .exceptions import (CollectionNameNotFound, IndexExistsError, QueryArgumentsError, QueryEmptyException, ClusterNotConnected, BucketNotConnected,
+from .exceptions import (CollectionNameNotFound, IndexExistsError, QueryArgumentsError, QueryEmptyException, ClusterNotConnected, BucketNotConnected, ScopeWaitException,
                          ScopeNotConnected, CollectionSubdocUpsertError, BucketWaitException, BucketStatsError, CollectionCountException, CollectionCountError)
 from .retry import retry, retry_inline
 from .cb_session import CBSession
@@ -103,6 +103,14 @@ class CBConnect(CBSession):
                 raise BucketWaitException(f"item count {bucket_stats['itemCount']} less than {count}")
         except Exception as err:
             raise BucketWaitException(f"bucket_wait: error: {err}")
+
+    @retry(factor=0.5)
+    def scope_wait(self, bucket: str, scope: str):
+        bucket = self._cluster.bucket(bucket)
+        cm = bucket.collections()
+        result = next((s for s in cm.get_all_scopes() if s.name == scope), None)
+        if not result:
+            raise ScopeWaitException(f"scope_wait: scope {scope} does not exist")
 
     def has_primary_index(self, create: bool = False, replica: int = 0, timeout: int = 480):
         qim = self._cluster.query_indexes()

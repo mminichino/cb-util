@@ -8,6 +8,7 @@ from jinja2 import Template
 from cbcmgr.cb_connect import CBConnect
 from cbcmgr.cb_management import CBManager
 from cbcmgr.cb_bucket import Bucket
+from cbcmgr.cb_index import CBQueryIndex
 
 
 class DBRead(object):
@@ -94,6 +95,26 @@ class DBManagement(object):
 
     def __init__(self, db: CBManager):
         self.db = db
+        self._result = None
 
     def create_bucket(self, bucket: Bucket):
-        self.db.create_bucket(bucket)
+        self._result = self.db.create_bucket(bucket)
+
+    def create_scope(self, bucket: str, scope: str):
+        self.db.bucket_wait(bucket)
+        self.db.bucket(bucket)
+        self._result = self.db.create_scope(scope)
+
+    def create_collection(self, bucket: str, scope: str, collection: str, max_ttl: int):
+        self.db.bucket_wait(bucket)
+        self.db.scope_wait(bucket, scope)
+        self.db.bucket(bucket)
+        self.db.scope(scope)
+        self._result = self.db.create_collection(collection, max_ttl)
+
+    def create_index(self, index: CBQueryIndex):
+        self._result = self.db.cb_index_create(index)
+
+    @property
+    def result(self):
+        return self._result

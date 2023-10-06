@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 from .cb_bucket import Bucket
+from .cb_index import CBQueryIndex
 from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError, PathMapUpsertError, CollectionUpsertError,
                          ScopeCreateException, BucketCreateException, CollectionCreateException)
 from .retry import retry, retry_inline
@@ -17,8 +18,7 @@ import logging
 import json
 import xmltodict
 import concurrent.futures
-from attr.validators import instance_of as io, optional
-from typing import Protocol, Iterable, Optional, Any
+from typing import Optional, Any
 from couchbase.cluster import Cluster
 from couchbase.options import QueryOptions
 from couchbase.diagnostics import ServiceType, PingState
@@ -32,36 +32,6 @@ from couchbase.options import WaitUntilReadyOptions, UpsertOptions
 
 logger = logging.getLogger('cbutil.manager')
 logger.addHandler(logging.NullHandler())
-
-
-@attr.s
-class CBQueryIndex(Protocol):
-    name = attr.ib(validator=io(str))
-    is_primary = attr.ib(validator=io(bool))
-    state = attr.ib(validator=io(str))
-    namespace = attr.ib(validator=io(str))
-    keyspace = attr.ib(validator=io(str))
-    index_key = attr.ib(validator=io(Iterable))
-    condition = attr.ib(validator=io(str))
-    bucket_name = attr.ib(validator=optional(io(str)))
-    scope_name = attr.ib(validator=optional(io(str)))
-    collection_name = attr.ib(validator=optional(io(str)))
-    partition = attr.ib(validator=optional(validator=io(str)))
-
-    @classmethod
-    def from_server(cls, json_data):
-        return cls(json_data.get("name"),
-                   bool(json_data.get("is_primary")),
-                   json_data.get("state"),
-                   json_data.get("keyspace_id"),
-                   json_data.get("namespace_id"),
-                   json_data.get("index_key", []),
-                   json_data.get("condition", ""),
-                   json_data.get("bucket_id", json_data.get("keyspace_id", "")),
-                   json_data.get("scope_id", ""),
-                   json_data.get("keyspace_id", ""),
-                   json_data.get("partition", None)
-                   )
 
 
 class CBManager(CBConnect):
@@ -114,6 +84,14 @@ class CBManager(CBConnect):
         bm = self._cluster.buckets()
         return bm.get_all_buckets()
 
+    def scope_list_all(self):
+        cm = self._bucket.collections()
+        return cm.get_all_scopes()
+
+    @staticmethod
+    def collection_list_all(scope):
+        return scope.collections
+
     def create_scope(self, name):
         if not name:
             raise ScopeCreateException(f"scope name can not be null")
@@ -127,14 +105,14 @@ class CBManager(CBConnect):
             pass
         self.scope(name)
 
-    def create_collection(self, name):
+    def create_collection(self, name, max_ttl=0):
         if not name:
             raise CollectionCreateException(f"collection name can not be null")
         self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
         logger.debug(f"create_collection: create collection {name}")
         try:
             if name != "_default":
-                collection_spec = CollectionSpec(name, scope_name=self._scope.name)
+                collection_spec = CollectionSpec(name, scope_name=self._scope.name, max_ttl=timedelta(max_ttl))
                 cm = self._bucket.collections()
                 cm.create_collection(collection_spec, CreateCollectionOptions(timeout=timedelta(seconds=25)))
                 retry_inline(self.get_collection, cm, name)
@@ -346,6 +324,35 @@ class CBManager(CBConnect):
             pass
 
     @retry()
+    def cb_index_create(self, index: CBQueryIndex, timeout: int = 480):
+        if index.is_primary:
+            index_options = CreatePrimaryQueryIndexOptions()
+        else:
+            index_options = CreateQueryIndexOptions()
+
+        index_options.update(deferred=True)
+        index_options.update(timeout=timedelta(seconds=timeout))
+        index_options.update(num_replicas=index.num_replica)
+        index_options.update(ignore_if_exists=True)
+        if index.bucket_id:
+            index_options.update(scope_name=index.scope_id)
+            index_options.update(collection_name=index.keyspace_id)
+        if index.condition:
+            index_options.update(condition=index.condition)
+
+        if index.bucket_id:
+            bucket_name = index.bucket_id
+        else:
+            bucket_name = index.keyspace_id
+
+        qim = self._cluster.query_indexes()
+
+        if index.is_primary:
+            qim.create_primary_index(bucket_name, index_options)
+        else:
+            qim.create_index(bucket_name, index.name, index.index_key, index_options)
+
+    @retry()
     def cb_drop_primary_index(self, timeout: int = 120):
         if self._collection_name != '_default':
             index_options = DropPrimaryQueryIndexOptions(timeout=timedelta(seconds=timeout),
@@ -383,7 +390,7 @@ class CBManager(CBConnect):
 
         for row in results:
             for key, value in row.items():
-                entry = CBQueryIndex.from_server(value)
+                entry = CBQueryIndex.from_dict(value)
                 all_list.append(entry)
 
         return all_list
@@ -395,7 +402,7 @@ class CBManager(CBConnect):
             index_list = self.index_list_all()
             for item in index_list:
                 if index_name == '#primary':
-                    if (item.collection_name == self.collection_name or item.bucket_name == self.collection_name) \
+                    if (item.keyspace_id == self.collection_name or item.keyspace_id == self._bucket_name) \
                             and item.name == '#primary':
                         return True
                 elif item.name == index_name:
@@ -421,7 +428,7 @@ class CBManager(CBConnect):
 
         for item in index_list:
             if item.name == index_name and (
-                    item.collection_name == self.collection_name or item.bucket_name == self.collection_name):
+                    item.keyspace_id == self.collection_name or item.keyspace_id == self._bucket_name):
                 if len(list(item.index_key)) == 0:
                     return doc_key_field
                 else:
@@ -468,7 +475,7 @@ class CBManager(CBConnect):
         try:
             index_list = self.index_list_all()
             for item in index_list:
-                if item.collection_name == self.collection_name or item.bucket_name == self.collection_name:
+                if item.keyspace_id == self.collection_name or item.keyspace_id == self._bucket_name:
                     return_list[item.name] = item.state
             return return_list
         except Exception as err:

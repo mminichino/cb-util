@@ -24,3 +24,21 @@ class Bucket:
     name: Optional[str] = attr.ib(default=None)
     minimum_durability_level: Optional[DurabilityLevel] = attr.ib(default=DurabilityLevel.NONE)
     storage_backend: Optional[StorageBackend] = attr.ib(default=StorageBackend.COUCHSTORE)
+
+    @classmethod
+    def from_dict(cls, values: dict):
+        return cls(
+            values.get('flush_enabled'),
+            values.get('num_replicas'),
+            values.get('ram_quota_mb'),
+            values.get('replica_index'),
+            BucketType(values.get('bucket_type')),
+            values.get('max_ttl'),
+            timedelta(values.get('max_expiry')),
+            CompressionMode(values.get('compression_mode')),
+            ConflictResolutionType(values.get('conflict_resolution_type')),
+            EvictionPolicyType(values.get('eviction_policy')),
+            values.get('name'),
+            DurabilityLevel(values.get('minimum_durability_level')),
+            StorageBackend(values.get('storage_backend')),
+        )
