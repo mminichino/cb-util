@@ -112,11 +112,14 @@ class CLI(object):
 
         self.init_parser()
 
-        screen_handler = logging.StreamHandler()
-
         if sys.stdin and sys.stdin.isatty():
+            screen_handler = logging.StreamHandler()
+            screen_handler.setFormatter(CustomDisplayFormatter())
+        elif sys.stderr.isatty():
+            screen_handler = logging.StreamHandler(sys.stderr)
             screen_handler.setFormatter(CustomDisplayFormatter())
         else:
+            screen_handler = logging.StreamHandler()
             screen_handler.setFormatter(CustomNullFormatter())
 
         logger.addHandler(screen_handler)

@@ -5,12 +5,13 @@ import argparse
 import warnings
 from overrides import override
 from cbcmgr import VERSION
-from cbcmgr.cli.cli import CLI
+from cbcmgr.cli.cli import CLI, CustomDisplayFormatter
 from cbcmgr.cli.exceptions import *
 import cbcmgr.cli.config as config
 from cbcmgr.cli.export import CBExport, ExportType
 from cbcmgr.cli.pimport import PluginImport
 from cbcmgr.cli.main import MainLoop
+from cbcmgr.cli.replicate import Replicator
 from cbcmgr.cli.config import OperatingMode
 
 
@@ -83,10 +84,17 @@ class CBCUtil(CLI):
         export_subparser = export_parser.add_subparsers(dest='export_command')
         export_subparser.add_parser('csv', help="Export CSV", parents=[opt_parser], add_help=False)
         export_subparser.add_parser('json', help="Export JSON", parents=[opt_parser], add_help=False)
+        replicate_parser = command_subparser.add_parser('replicate', help="Replicate Data", parents=[opt_parser], add_help=False)
+        replicate_subparser = replicate_parser.add_subparsers(dest='replicate_command')
+        replicate_subparser.add_parser('source', help="Source Side", parents=[opt_parser], add_help=False)
+        replicate_subparser.add_parser('target', help="Target Side", parents=[opt_parser], add_help=False)
 
     def run(self):
-        logger.info("CBCUtil version %s" % VERSION)
+        if 'replicate_command' in self.options and self.options.replicate_command != 'source':
+            logger.info("CBCUtil version %s" % VERSION)
+
         config.process_params(self.options)
+
         if self.options.command == 'list':
             MainLoop().cluster_list()
         elif self.options.command == 'schema':
@@ -100,6 +108,11 @@ class CBCUtil(CLI):
                 CBExport().export(ExportType.json)
         elif self.options.command == 'import':
             PluginImport().import_tables()
+        elif self.options.command == 'replicate':
+            if self.options.replicate_command == 'source':
+                Replicator().source()
+            elif self.options.replicate_command == 'target':
+                Replicator().target()
         else:
             if config.op_mode == OperatingMode.LOAD.value and self.options.schema:
                 MainLoop().schema_load()

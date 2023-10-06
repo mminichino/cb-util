@@ -117,6 +117,10 @@ class CBManager(CBConnect):
         except (BucketNotFoundException, BucketDoesNotExistException):
             pass
 
+    def bucket_list_all(self):
+        bm = self._cluster.buckets()
+        return bm.get_all_buckets()
+
     def create_scope(self, name):
         if not name:
             raise ScopeCreateException(f"scope name can not be null")

@@ -50,7 +50,7 @@ class MainLoop(object):
         return result_set
 
     def schema_remove(self):
-        dbm = CBManager(config.host, config.username, config.password, ssl=config.tls).connect()
+        dbm = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db).connect()
         if config.schema_name:
             bucket_list = [b.name for b in config.schema.buckets]
         else:
@@ -91,7 +91,7 @@ class MainLoop(object):
                     print(f"  SQL  : {rule.sql}")
 
     def cluster_list(self):
-        db = CBManager(config.host, config.username, config.password, ssl=config.tls)
+        db = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db)
 
         if config.wait_mode:
             try:
@@ -163,7 +163,9 @@ class MainLoop(object):
             rand.prepare_template(schema.doc)
 
             try:
-                db = CBConnect(config.host, config.username, config.password, ssl=config.tls).connect(bucket.name, scope.name, collection.name)
+                db = CBConnect(config.host, config.username, config.password, ssl=config.tls,
+                               project=config.capella_project,
+                               database=config.capella_db).connect(bucket.name, scope.name, collection.name)
             except Exception as err:
                 raise TestRunError(f"can not connect to Couchbase: {err}")
 
@@ -211,7 +213,7 @@ class MainLoop(object):
         t_field = target_keyspace.split(':')[-1]
 
         try:
-            db = CBConnect(config.host, config.username, config.password, ssl=config.tls).connect()
+            db = CBConnect(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db).connect()
         except Exception as err:
             raise TestRunError(f"can not connect to Couchbase: {err}")
 
@@ -222,7 +224,7 @@ class MainLoop(object):
 
     def run_sql_rule(self, query: str):
         try:
-            db = CBConnect(config.host, config.username, config.password, ssl=config.tls).connect()
+            db = CBConnect(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db).connect()
         except Exception as err:
             raise TestRunError(f"can not connect to Couchbase: {err}")
 
@@ -242,7 +244,9 @@ class MainLoop(object):
 
         try:
             self.prep_bucket(bucket, scope, collection)
-            db = CBConnect(config.host, config.username, config.password, ssl=config.tls).connect(bucket, scope, collection)
+            db = CBConnect(config.host, config.username, config.password, ssl=config.tls,
+                           project=config.capella_project,
+                           database=config.capella_db).connect(bucket, scope, collection)
         except Exception as err:
             raise TestRunError(f"can not connect to Couchbase: {err}")
 
@@ -268,7 +272,8 @@ class MainLoop(object):
                         doc_key = json_object[config.key_field]
                     else:
                         doc_key = key_count
-                    tasks.add(executor.submit(db_op.execute, doc_key, json_object))
+                    document = dict(json_object).copy()
+                    tasks.add(executor.submit(db_op.execute, str(doc_key), document, False))
                     object_count += 1
                     buffer = buffer[position:]
                     buffer = buffer.lstrip()
@@ -284,7 +289,9 @@ class MainLoop(object):
         collection = config.collection_name
 
         try:
-            db = CBConnect(config.host, config.username, config.password, ssl=config.tls).connect(bucket, scope, collection)
+            db = CBConnect(config.host, config.username, config.password, ssl=config.tls,
+                           project=config.capella_project,
+                           database=config.capella_db).connect(bucket, scope, collection)
         except Exception as err:
             raise TestRunError(f"can not connect to Couchbase: {err}")
 
