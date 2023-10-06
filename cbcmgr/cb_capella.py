@@ -73,7 +73,7 @@ class CapellaBucketType(str, Enum):
     ephemeral = 'ephemeral'
 
 
-class CapellaDurabilityLevel(str, Enum):
+class CapellaDurabilityLevel(int, Enum):
     none = 0
     majority = 1
     majorityAndPersistActive = 2
