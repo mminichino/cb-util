@@ -7,7 +7,8 @@ from overrides import override
 from cbcmgr import VERSION
 from cbcmgr.cli.cli import CLI
 from cbcmgr.cli.exceptions import *
-from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials, Bucket
+from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials
+from cbcmgr.cb_bucket import Bucket
 import pandas as pd
 
 warnings.filterwarnings("ignore")
@@ -107,7 +108,12 @@ class CapellaCLI(CLI):
         bucket_quota = self.options.quota
         bucket_replicas = self.options.replicas
         bucket_ttl = self.options.ttl
-        bucket = Bucket().create(bucket_name, bucket_quota, bucket_replicas, bucket_ttl)
+        bucket = Bucket(**dict(
+            name=bucket_name,
+            ram_quota_mb=bucket_quota,
+            num_replicas=bucket_replicas,
+            max_ttl=bucket_ttl
+        ))
 
         cluster = Capella(project_id=project_id).get_cluster(database)
         if cluster:

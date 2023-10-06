@@ -86,3 +86,7 @@ class PluginImportError(FatalError):
 
 class KeyFormatError(FatalError):
     pass
+
+
+class ReplicationError(FatalError):
+    pass

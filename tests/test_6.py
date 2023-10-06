@@ -2,8 +2,8 @@
 
 import warnings
 import time
-from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials, Bucket
-
+from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials
+from cbcmgr.cb_bucket import Bucket
 
 warnings.filterwarnings("ignore")
 
@@ -41,7 +41,10 @@ def test_capella_1():
 
     assert account_id is not None
 
-    bucket = Bucket().create("employees", 128)
+    bucket = Bucket(**dict(
+        name="employees",
+        ram_quota_mb=128
+    ))
 
     print("Creating bucket")
     bucket_id = Capella(project_id=project_id).add_bucket(cluster_id, bucket)

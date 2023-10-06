@@ -17,6 +17,7 @@ sys.path.append(current)
 
 from cbcmgr.cb_connect import CBConnect
 from cbcmgr.cb_management import CBManager
+from cbcmgr.cb_bucket import Bucket
 from cbcmgr.cb_operation_s import CBOperation, Operation
 from cbcmgr.mt_pool import CBPool
 from cbcmgr.config import UpsertMapConfig, MapUpsertType, KeyStyle
@@ -158,15 +159,19 @@ def container_stop():
     pytest_sessionfinish(None, 0)
 
 
-def manual_1(hostname, bucket, tls, scope, collection):
+def manual_1(hostname, bucket_name, tls, scope, collection):
     replica_count = 0
+    bucket = Bucket(**dict(
+        name=bucket_name,
+        num_replicas=0
+    ))
 
     print("=> Connect")
-    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
-    dbm.create_bucket(bucket, quota=100)
+    dbm = CBManager(hostname, "Administrator", "password", ssl=tls).connect()
+    dbm.create_bucket(bucket)
     dbm.create_scope(scope)
     dbm.create_collection(collection)
-    dbc = CBConnect(hostname, "Administrator", "password", ssl=False).connect(bucket, scope, collection)
+    dbc = CBConnect(hostname, "Administrator", "password", ssl=tls).connect(bucket_name, scope, collection)
     print("=> Create indexes")
     dbm.cb_create_primary_index(replica=replica_count)
     index_name = dbm.cb_create_index(fields=["data"], replica=replica_count)
@@ -177,7 +182,7 @@ def manual_1(hostname, bucket, tls, scope, collection):
     result = dbm.is_index(index_name)
     assert result is True
     dbc.cb_upsert("test::1", document)
-    dbc.bucket_wait(bucket, count=1)
+    dbc.bucket_wait(bucket_name, count=1)
     print("=> Data tests")
     result = dbc.cb_get("test::1")
     assert result == document
@@ -200,7 +205,7 @@ def manual_1(hostname, bucket, tls, scope, collection):
     dbm.cb_drop_index(index_name)
     dbm.delete_wait()
     dbm.delete_wait(index_name)
-    dbm.drop_bucket(bucket)
+    dbm.drop_bucket(bucket_name)
 
 
 def manual_2(hostname, bucket, tls, scope, collection):
@@ -233,8 +238,12 @@ def manual_3(hostname, bucket, tls, scope, collection):
     CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 
 
-def manual_4(hostname, bucket, tls, scope, collection, file):
-    dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
+def manual_4(hostname, bucket_name, tls, scope, collection, file):
+    bucket = Bucket(**dict(
+        name=bucket_name,
+        num_replicas=0
+    ))
+    dbm = CBManager(hostname, "Administrator", "password", ssl=tls).connect()
     dbm.create_bucket(bucket)
     dbm.create_scope(scope)
     dbm.create_collection(collection)

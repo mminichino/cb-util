@@ -2,13 +2,14 @@
 ##
 
 from __future__ import annotations
+from .cb_bucket import Bucket
 from .exceptions import (IndexNotReady, IndexNotFoundError, CollectionNameNotFound, IndexStatError, ClusterHealthCheckError, PathMapUpsertError, CollectionUpsertError,
                          ScopeCreateException, BucketCreateException, CollectionCreateException)
 from .retry import retry, retry_inline
 from .cb_connect import CBConnect
 from .util import r_getattr, omit_path, copy_path
 from .config import UpsertMapConfig, MapUpsertType
-from .cb_capella import Capella, Bucket
+from .cb_capella import Capella
 from datetime import timedelta
 import attr
 import hashlib
@@ -21,7 +22,7 @@ from typing import Protocol, Iterable, Optional, Any
 from couchbase.cluster import Cluster
 from couchbase.options import QueryOptions
 from couchbase.diagnostics import ServiceType, PingState
-from couchbase.management.buckets import CreateBucketSettings, BucketType, StorageBackend, BucketSettings
+from couchbase.management.buckets import CreateBucketSettings, BucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.exceptions import (QueryIndexNotFoundException, QueryIndexAlreadyExistsException, BucketAlreadyExistsException, BucketNotFoundException, BucketDoesNotExistException,
                                   WatchQueryIndexTimeoutException, ScopeAlreadyExistsException, CollectionAlreadyExistsException, CollectionNotFoundException)
@@ -72,42 +73,34 @@ class CBManager(CBConnect):
         self._cluster = self.session()
         return self
 
-    def create_bucket(self, name, quota: int = 256, replicas: int = 0):
-        if not name:
-            raise BucketCreateException(f"bucket name can not be null")
-
+    def create_bucket(self, bucket: Bucket):
         self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
 
-        result = self.get_bucket(name)
+        result = self.get_bucket(bucket.name)
         if result:
-            logger.debug(f"create_bucket: bucket {name} already exists")
+            logger.debug(f"create_bucket: bucket {bucket.name} already exists")
         else:
-            logger.debug(f"create_bucket: create bucket {name}")
+            logger.debug(f"create_bucket: create bucket {bucket.name}")
             if self.capella_project and self.capella_db:
                 project = Capella().get_project(self.capella_project)
                 if not project:
                     raise BucketCreateException(f"Can not lookup Capella project {self.capella_project}")
                 project_id = project.get('id')
-                bucket = Bucket().create(name, quota, replicas, 0)
                 cluster = Capella(project_id=project_id).get_cluster(self.capella_db)
                 if not cluster:
                     raise BucketCreateException(f"Can not find Capella database {self.capella_db}")
                 cluster_id = cluster.get('id')
-                logger.debug(f"Creating Capella bucket {name} in project {project_id} database {cluster_id}")
+                logger.debug(f"Creating Capella bucket {bucket.name} in project {project_id} database {cluster_id}")
                 Capella(project_id=project_id).add_bucket(cluster_id, bucket)
             else:
                 try:
                     bm = self._cluster.buckets()
-                    bm.create_bucket(CreateBucketSettings(name=name,
-                                                          bucket_type=BucketType.COUCHBASE,
-                                                          storage_backend=StorageBackend.COUCHSTORE,
-                                                          num_replicas=replicas,
-                                                          ram_quota_mb=quota),
-                                     CreateBucketOptions(timeout=timedelta(seconds=25)))
+                    # noinspection PyTypeChecker
+                    bm.create_bucket(CreateBucketSettings(**attr.asdict(bucket)), CreateBucketOptions(timeout=timedelta(seconds=25)))
                 except BucketAlreadyExistsException:
                     pass
 
-        self.bucket(name)
+        self.bucket(bucket.name)
 
     def drop_bucket(self, name):
         logger.debug(f"drop_bucket: drop bucket {name}")

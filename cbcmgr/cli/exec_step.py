@@ -6,6 +6,8 @@ import time
 import re
 from jinja2 import Template
 from cbcmgr.cb_connect import CBConnect
+from cbcmgr.cb_management import CBManager
+from cbcmgr.cb_bucket import Bucket
 
 
 class DBRead(object):
@@ -86,3 +88,12 @@ class DBQuery(object):
     @property
     def result(self):
         return self._result
+
+
+class DBManagement(object):
+
+    def __init__(self, db: CBManager):
+        self.db = db
+
+    def create_bucket(self, bucket: Bucket):
+        self.db.create_bucket(bucket)

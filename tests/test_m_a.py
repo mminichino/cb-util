@@ -16,6 +16,7 @@ sys.path.append(parent)
 sys.path.append(current)
 
 from cbcmgr.cb_management import CBManager
+from cbcmgr.cb_bucket import Bucket
 from cbcmgr.cb_operation_a import CBOperationAsync, Operation
 from cbcmgr.cb_operation_s import CBOperation
 from cbcmgr.cb_connect_lite_a import CBConnectLiteAsync
@@ -233,7 +234,11 @@ def manual_3(hostname, bucket, tls, scope, collection):
     CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 
 
-def manual_4(hostname, bucket, tls, scope, collection, file):
+def manual_4(hostname, bucket_name, tls, scope, collection, file):
+    bucket = Bucket(**dict(
+        name=bucket_name,
+        num_replicas=0
+    ))
     dbm = CBManager(hostname, "Administrator", "password", ssl=False).connect()
     dbm.create_bucket(bucket)
     dbm.create_scope(scope)

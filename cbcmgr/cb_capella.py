@@ -17,6 +17,7 @@ from itertools import cycle
 from ipaddress import IPv4Network
 from cbcmgr.httpsessionmgr import APISession, AuthType
 from cbcmgr.exceptions import CapellaError, APIError
+from cbcmgr.cb_bucket import Bucket
 
 logger = logging.getLogger('cbcmgr.capella')
 logger.addHandler(logging.NullHandler())
@@ -67,9 +68,16 @@ class SupportTZ(str, Enum):
     western_us = 'PT'
 
 
-class BucketType(str, Enum):
-    couchbase = 'couchbase'
+class CapellaBucketType(str, Enum):
+    couchbase = 'membase'
     ephemeral = 'ephemeral'
+
+
+class CapellaDurabilityLevel(str, Enum):
+    none = 0
+    majority = 1
+    majorityAndPersistActive = 2
+    persistToMajority = 3
 
 
 class BucketBackend(str, Enum):
@@ -224,35 +232,6 @@ class Credentials:
             [
                 UserAccess()
             ]
-        )
-
-
-@attr.s
-class Bucket:
-    name: Optional[str] = attr.ib(default=None)
-    type: Optional[str] = attr.ib(default=None)
-    storageBackend: Optional[str] = attr.ib(default=None)
-    memoryAllocationInMb: Optional[str] = attr.ib(default=None)
-    bucketConflictResolution: Optional[BucketResolution] = attr.ib(default=None)
-    durabilityLevel: Optional[BucketDurability] = attr.ib(default=None)
-    replicas: Optional[int] = attr.ib(default=None)
-    flush: Optional[bool] = attr.ib(default=None)
-    timeToLiveInSeconds: Optional[int] = attr.ib(default=None)
-    evictionPolicy: Optional[BucketEviction] = attr.ib(default=None)
-
-    @classmethod
-    def create(cls, name, quota, replicas=1, ttl=0, bucket_type=BucketType.couchbase, backend=BucketBackend.couchstore):
-        return cls(
-            name,
-            bucket_type,
-            backend,
-            quota,
-            BucketResolution.seqno,
-            BucketDurability.none,
-            replicas,
-            False,
-            ttl,
-            BucketEviction.fullEviction
         )
 
 
@@ -496,7 +475,17 @@ class Capella(APISession):
             return response.get('id')
 
         # noinspection PyTypeChecker
-        parameters = attrs.asdict(bucket)
+        parameters = dict(
+            name=bucket.name,
+            type=CapellaBucketType(bucket.bucket_type.value).name,
+            storageBackend=bucket.storage_backend.value,
+            memoryAllocationInMb=bucket.ram_quota_mb,
+            bucketConflictResolution=bucket.conflict_resolution_type.value,
+            durabilityLevel=CapellaDurabilityLevel(bucket.minimum_durability_level.value).name,
+            replicas=bucket.num_replicas,
+            flush=bucket.flush_enabled,
+            timeToLiveInSeconds=bucket.max_ttl
+        )
         logger.debug(f"add_bucket: \n{json.dumps(parameters, indent=2)}")
         logger.debug(f"add_bucket: org_id = {self.organization_id} project_id = {self.project_id} cluster_id = {cluster_id}")
 

@@ -19,6 +19,7 @@ from cbcmgr.cli.exec_step import DBRead, DBWrite, DBQuery
 from cbcmgr.cli.schema import Bucket, Scope, Collection
 from cbcmgr.cli.schema import ProcessSchema, CollectionDoc
 from cbcmgr.cli.keyformat import KeyStyle, KeyFormat
+from cbcmgr.cb_bucket import Bucket as CouchbaseBucket
 
 
 class MainLoop(object):
@@ -28,9 +29,14 @@ class MainLoop(object):
         rand.rand_init()
 
     @staticmethod
-    def prep_bucket(bucket, scope, collection, quota: int = 256):
+    def prep_bucket(name, scope, collection, quota: int = 256):
         dbm = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db).connect()
-        dbm.create_bucket(bucket, quota)
+        bucket = CouchbaseBucket(**dict(
+            name=name,
+            ram_quota_mb=quota,
+            num_replicas=config.replicas
+        ))
+        dbm.create_bucket(bucket)
         dbm.create_scope(scope)
         dbm.create_collection(collection)
         return dbm
