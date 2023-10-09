@@ -5,7 +5,7 @@ import argparse
 import warnings
 from overrides import override
 from cbcmgr import VERSION
-from cbcmgr.cli.cli import CLI, CustomDisplayFormatter
+from cbcmgr.cli.cli import CLI
 from cbcmgr.cli.exceptions import *
 import cbcmgr.cli.config as config
 from cbcmgr.cli.export import CBExport, ExportType
@@ -55,6 +55,7 @@ class CBCUtil(CLI):
         opt_parser.add_argument('-O', '--stdout', action='store_true', help="Output to terminal")
         opt_parser.add_argument('-P', '--plugin', action='store', help="Export Plugin")
         opt_parser.add_argument('-V', '--variable', action='append', help="Plugin Variables")
+        opt_parser.add_argument('-F', '--filter', nargs='+', action='extend', help="Filter Expressions")
         opt_parser.add_argument('--project', action='store', help="Capella project")
         opt_parser.add_argument('--db', action='store', help="Capella database")
         opt_parser.add_argument('--docid', action='store', help="Import document ID field", default="doc_id")
@@ -110,7 +111,7 @@ class CBCUtil(CLI):
             PluginImport().import_tables()
         elif self.options.command == 'replicate':
             if self.options.replicate_command == 'source':
-                Replicator().source()
+                Replicator(self.options.filter).source()
             elif self.options.replicate_command == 'target':
                 Replicator().target()
         else:

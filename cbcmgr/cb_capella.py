@@ -15,6 +15,7 @@ import string
 import random
 from itertools import cycle
 from ipaddress import IPv4Network
+from couchbase.management.users import Role
 from cbcmgr.httpsessionmgr import APISession, AuthType
 from cbcmgr.exceptions import CapellaError, APIError
 from cbcmgr.cb_bucket import Bucket
@@ -234,6 +235,20 @@ class Credentials:
             ]
         )
 
+    @classmethod
+    def from_cbs(cls, username: str, password: str, roles: List[Role]):
+        access = UserAccess()
+        access.privileges.append("read")
+        if any(r for r in roles if r.name == 'data_writer') or any(r for r in roles if r.name == 'query_insert') or any(r for r in roles if r.name == 'query_delete'):
+            access.privileges.append("write")
+        return cls(
+            username,
+            password,
+            [
+                UserAccess()
+            ]
+        )
+
 
 class NetworkDriver(object):
 
@@ -301,17 +316,19 @@ class Capella(APISession):
 
     @staticmethod
     def valid_password(password: str):
-        m = 0
+        lower = 0
+        upper = 0
+        digit = 0
         if len(password) >= 8:
             for i in password:
                 if i.islower():
-                    m += 1
+                    lower += 1
                 if i.isupper():
-                    m += 1
+                    upper += 1
                 if i.isdigit():
-                    m += 1
+                    digit += 1
 
-        if m >= 3:
+        if lower >= 1 and upper >= 1 and digit >= 1:
             return True
         else:
             return False

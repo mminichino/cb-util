@@ -10,8 +10,10 @@ from couchbase.bucket import Bucket
 from couchbase.scope import Scope
 from couchbase.collection import Collection
 from couchbase.exceptions import (BucketDoesNotExistException, BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException)
+from couchbase.management.buckets import BucketType
 from cbcmgr.cb_session import BucketMode
 from cbcmgr.cb_connect_lite import CBConnectLite
+from cbcmgr.cb_bucket import Bucket as CouchbaseBucket
 
 logger = logging.getLogger('cbutil.operation')
 logger.addHandler(logging.NullHandler())
@@ -26,7 +28,7 @@ class Operation(Enum):
 
 class CBOperation(CBConnectLite):
 
-    def __init__(self, *args, create: bool = False, quota: int = 256, replicas: int = 0, mode: BucketMode = BucketMode.DEFAULT, **kwargs):
+    def __init__(self, *args, create: bool = False, quota: int = 256, replicas: int = 0, max_ttl: int = 0, flush: bool = False, mode: BucketMode = BucketMode.DEFAULT, **kwargs):
         super().__init__(*args, **kwargs)
         logger.debug("begin operation class")
         self._cluster: Cluster = self.session()
@@ -43,6 +45,8 @@ class CBOperation(CBConnectLite):
         self.quota = quota
         self.replicas = replicas
         self.bucket_mode = mode
+        self.max_ttl = max_ttl
+        self.flush_enabled = flush
 
     class DBRead:
 
@@ -111,7 +115,18 @@ class CBOperation(CBConnectLite):
         def result(self):
             return self._result
 
-    def connect(self, keyspace: str):
+    def connect(self, keyspace: str, bucket_struct: CouchbaseBucket = None):
+        if bucket_struct:
+            self.quota = bucket_struct.ram_quota_mb
+            self.replicas = bucket_struct.num_replicas
+            self.max_ttl = bucket_struct.max_ttl
+            self.flush_enabled = bucket_struct.flush_enabled
+            if bucket_struct.bucket_type == BucketType.COUCHBASE:
+                self.bucket_mode = BucketMode.DEFAULT
+            elif bucket_struct.bucket_type == BucketType.EPHEMERAL:
+                self.bucket_mode = BucketMode.CACHE
+            else:
+                self.bucket_mode = BucketMode.CAPACITY
         parts = keyspace.split('.')
         bucket = parts[0]
         scope = parts[1] if len(parts) > 1 else "_default"
@@ -139,7 +154,7 @@ class CBOperation(CBConnectLite):
             self._bucket = self.get_bucket(self._cluster, name)
         except BucketNotFoundException:
             if self.create:
-                self.create_bucket(self._cluster, name, self.quota, self.replicas, self.bucket_mode)
+                self.create_bucket(self._cluster, name, self.quota, self.replicas, self.max_ttl, self.flush_enabled, self.bucket_mode)
                 return self._bucket_(name)
             else:
                 raise

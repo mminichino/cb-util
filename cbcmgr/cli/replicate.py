@@ -1,6 +1,7 @@
 #
 #
 
+import re
 import sys
 import attr
 import json
@@ -14,12 +15,12 @@ from queue import Queue, Empty
 from enum import Enum
 from typing import Optional
 from datetime import timedelta
-from cbcmgr.cb_management import CBManager
-from cbcmgr.cli.exec_step import DBManagement
 from cbcmgr.cb_bucket import Bucket
 from cbcmgr.cb_index import CBQueryIndex
+from couchbase.management.users import Role
 from cbcmgr.cb_collection import Collection
 from cbcmgr.cli.exceptions import ReplicationError
+from cbcmgr.cb_operation_s import CBOperation
 
 logger = logging.getLogger('cbutil.replicate')
 logger.addHandler(logging.NullHandler())
@@ -46,9 +47,38 @@ class EnumEncoder(json.JSONEncoder):
 
 class Replicator(object):
 
-    def __init__(self):
+    def __init__(self, filters=None):
         self.output = {}
+        if filters:
+            self.filters = filters
+        else:
+            self.filters = []
+        self.bucket_filters = []
+        self.scope_filters = []
+        self.collection_filters = []
+        self.user_filters = []
+        self.group_filters = []
         self.q = Queue()
+
+        self.process_filters()
+
+    def process_filters(self):
+        for f in self.filters:
+            try:
+                k = f.split(':')[0]
+                r = f.split(':')[1]
+            except IndexError:
+                continue
+            if k == 'bucket':
+                self.bucket_filters.append(r)
+            if k == 'scope':
+                self.scope_filters.append(r)
+            if k == 'collection':
+                self.collection_filters.append(r)
+            if k == 'user':
+                self.user_filters.append(r)
+            if k == 'group':
+                self.group_filters.append(r)
 
     def source(self):
         writer = threading.Thread(target=self.stream_output_thread)
@@ -96,23 +126,44 @@ class Replicator(object):
         self.q.put(json.dumps(entry))
 
     def read_schema_from_db(self):
-        dbm = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db).connect()
+        operator = CBOperation(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db)
 
-        bucket_list = dbm.bucket_list_all()
-        index_list = dbm.index_list_all()
+        bucket_list = operator.bucket_list
+        index_list = operator.index_list
+        user_list = operator.user_list
+        group_list = operator.group_list
+
+        for group in group_list:
+            if any(re.search(rx, group.get('name')) for rx in self.group_filters):
+                continue
+            struct = {'__GROUP__': group}
+            entry = json.dumps(struct, indent=2, cls=EnumEncoder)
+            self.q.put(entry)
+
+        for user in user_list:
+            if any(re.search(rx, user.get('username')) for rx in self.user_filters):
+                continue
+            struct = {'__USER__': user}
+            entry = json.dumps(struct, indent=2, cls=EnumEncoder)
+            self.q.put(entry)
 
         for bucket in bucket_list:
             bucket_index_list = []
             scope_list = []
             bucket_struct = Bucket(**bucket)
+            if any(re.search(rx, bucket_struct.name) for rx in self.bucket_filters):
+                continue
             # noinspection PyTypeChecker
             payload = attr.asdict(bucket_struct)
             struct = {'__BUCKET__': payload}
-            dbm.bucket(bucket_struct.name)
-            for scope in dbm.scope_list_all():
+            for scope in operator.scope_list(bucket_struct.name):
+                if any(re.search(rx, scope.name) for rx in self.scope_filters):
+                    continue
                 scope_record = {scope.name: []}
-                collection_list = dbm.collection_list_all(scope)
+                collection_list = operator.collection_list(bucket_struct.name, scope.name)
                 for collection in collection_list:
+                    if any(re.search(rx, collection.name) for rx in self.collection_filters):
+                        continue
                     scope_record[scope.name].append(
                         Collection(
                             name=collection.name,
@@ -129,7 +180,9 @@ class Replicator(object):
             self.q.put(entry)
 
     def read_schema_from_input(self):
-        dbm = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db).connect()
+        operator = CBOperation(config.host, config.username, config.password, create=True, ssl=config.tls, project=config.capella_project, database=config.capella_db)
+        user_list = []
+        group_list = []
 
         while True:
             try:
@@ -137,30 +190,57 @@ class Replicator(object):
                 data = json.loads(entry)
                 if data.get('__CMD__') == 'STOP':
                     break
+                if data.get('__GROUP__'):
+                    group_list.append(data.get('__GROUP__'))
+                if data.get('__USER__'):
+                    user_list.append(data.get('__USER__'))
                 if data.get('__BUCKET__'):
                     bucket = Bucket.from_dict(data.get('__BUCKET__'))
-                    logger.info(f"Replicating bucket {bucket.name}")
-                    dbm.create_bucket(bucket)
                     if data.get('__SCOPE__'):
                         scope_list = data.get('__SCOPE__')
                         for scope_struct in scope_list:
                             for scope, collections in scope_struct.items():
-                                logger.info(f"Replicating scope {bucket.name}.{scope}")
-                                dbm.create_scope(scope)
                                 for collection in collections:
-                                    logger.info(f"Replicating collection {bucket.name}.{scope}.{collection.get('name')}")
                                     collection_name = collection.get('name')
-                                    max_ttl = collection.get('max_ttl')
-                                    dbm.create_collection(collection_name, max_ttl)
+                                    keyspace = f"{bucket.name}.{scope}.{collection_name}"
+                                    logger.info(f"Replicating keyspace {keyspace}")
+                                    operator.connect(keyspace, bucket)
                     if data.get('__INDEX__'):
                         index_list = data.get('__INDEX__')
                         for index in index_list:
                             entry = CBQueryIndex.from_dict(index)
                             logger.info(f"Replicating index [{entry.keyspace_id}] {entry.name}")
-                            dbm.cb_index_create(entry)
+                            operator.index_create(entry)
             except Empty:
                 time.sleep(0.1)
                 continue
+
+        for group in group_list:
+            roles = []
+            for role in group.get('roles', []):
+                if role.get('scope') == '*':
+                    role['scope'] = None
+                if role.get('collection') == '*':
+                    role['collection'] = None
+                r = Role(**role)
+                roles.append(r)
+            logger.info(f"Creating group {group.get('name')}")
+            operator.create_group(group.get('name'), group.get('description'), roles if len(roles) > 0 else None)
+
+        for user in user_list:
+            roles = []
+            groups = []
+            for role in user.get('roles', []):
+                if role.get('scope') == '*':
+                    role['scope'] = None
+                if role.get('collection') == '*':
+                    role['collection'] = None
+                r = Role(**role)
+                roles.append(r)
+            if user.get('groups'):
+                groups = user.get('groups')
+            logger.info(f"Creating user {user.get('username')}")
+            operator.create_user(user.get('username'), user.get('name'), user.get('password'), roles if len(roles) > 0 else None, groups if len(groups) > 0 else None)
 
     @staticmethod
     def task_wait(tasks):
