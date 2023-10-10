@@ -1,6 +1,45 @@
 {
   "inventory": [
     {
+      "gamesim-sample": {
+        "buckets": [
+          {
+            "name": "gamesim-sample",
+            "api": {
+              "endpoint": "/sampleBuckets/install",
+              "data": ["gamesim-sample"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "beer-sample": {
+        "buckets": [
+          {
+            "name": "beer-sample",
+            "api": {
+              "endpoint": "/sampleBuckets/install",
+              "data": ["beer-sample"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "travel-sample": {
+        "buckets": [
+          {
+            "name": "travel-sample",
+            "api": {
+              "endpoint": "/sampleBuckets/install",
+              "data": ["travel-sample"]
+            }
+          }
+        ]
+      }
+    },
+    {
       "external_file": {
         "buckets": [
           {

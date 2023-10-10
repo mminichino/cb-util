@@ -17,9 +17,10 @@ from cbcmgr.cb_management import CBManager
 from cbcmgr.cli.exceptions import TestRunError
 from cbcmgr.cli.exec_step import DBRead, DBWrite, DBQuery
 from cbcmgr.cli.schema import Bucket, Scope, Collection
-from cbcmgr.cli.schema import ProcessSchema, CollectionDoc
+from cbcmgr.cli.schema import ProcessSchema, CollectionDoc, EnumEncoder
 from cbcmgr.cli.keyformat import KeyStyle, KeyFormat
 from cbcmgr.cb_bucket import Bucket as CouchbaseBucket
+from cbcmgr.exceptions import APIError, BadRequest
 
 
 class MainLoop(object):
@@ -73,6 +74,9 @@ class MainLoop(object):
             print(f"Schema: {schema.name}")
             for bucket in schema.buckets:
                 print(f"  Bucket: {bucket.name}")
+                if bucket.api:
+                    print(f"    - API endpoint: {bucket.api.endpoint}")
+                    continue
                 for scope in bucket.scopes:
                     print(f"    - Scope: {scope.name}")
                     for collection in scope.collections:
@@ -80,7 +84,7 @@ class MainLoop(object):
                         if collection.override_count:
                             print(f"        Document Count: {collection.record_count}")
                         print(f"        Schema:")
-                        json_output = json.dumps(collection.schema, indent=2)
+                        json_output = json.dumps(collection.schema, indent=2, cls=EnumEncoder)
                         lines = json_output.split('\n')
                         for line in lines:
                             print(f"               {line}")
@@ -116,9 +120,26 @@ class MainLoop(object):
                 print("Cluster Status:")
                 db.cluster_health_check(output=True, restrict=False)
 
+    def api_load(self, endpoint: str, data: str):
+        dbm = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db)
+        try:
+            dbm.mgmt_api_post(endpoint, data)
+            self.logger.info("API load complete")
+        except APIError as err:
+            if err.code == 400:
+                self.logger.info("API schema already loaded")
+            else:
+                raise
+        except Exception as err:
+            raise TestRunError(f"bucket API load error: {err}")
+
     def schema_load(self):
         self.logger.info("Processing buckets")
         for bucket in config.schema.buckets:
+            if bucket.api:
+                self.logger.info(f"Loading bucket {bucket.name}")
+                self.api_load(bucket.api.endpoint, bucket.api.data)
+                continue
             for scope in bucket.scopes:
                 for collection in scope.collections:
                     self.logger.info(f"Processing bucket {bucket.name} scope {scope.name} collection {collection.name}")

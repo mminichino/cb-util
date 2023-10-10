@@ -7,6 +7,7 @@ from .cb_session import CBSession, BucketMode
 from .cb_bucket import Bucket as CouchbaseBucket
 from .cb_index import CBQueryIndex
 from .cb_capella import Capella, Credentials
+from .httpsessionmgr import APISession
 import logging
 import hashlib
 import attr
@@ -33,6 +34,18 @@ class CBConnectLite(CBSession):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def mgmt_api_post(self, endpoint, data):
+        s = APISession(self.username, self.password)
+        s.set_host(self.rally_host_name, self.ssl, self.admin_port)
+        response = s.api_post(endpoint, data)
+        return response
+
+    def mgmt_api_get(self, endpoint):
+        s = APISession(self.username, self.password)
+        s.set_host(self.rally_host_name, self.ssl, self.admin_port)
+        response = s.api_get(endpoint).json()
+        return response
 
     @retry(always_raise_list=(BucketNotFoundException,))
     def get_bucket(self, cluster: Cluster, name: str) -> Bucket:

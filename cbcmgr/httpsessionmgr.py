@@ -15,7 +15,7 @@ from enum import Enum
 from urllib.parse import urlparse
 from requests.auth import AuthBase
 from .exceptions import (NotAuthorized, HTTPForbidden, HTTPNotImplemented, RequestValidationError, InternalServerError, APIError,
-                         PaginationDataNotFound, SyncGatewayOperationException, PreconditionFailed, ConflictException)
+                         PaginationDataNotFound, SyncGatewayOperationException, PreconditionFailed, ConflictException, BadRequest)
 
 
 class AuthType(Enum):
@@ -159,6 +159,8 @@ class APISession(object):
         self.logger.debug("API status code {}".format(code))
         if code == 200 or code == 201 or code == 202 or code == 204:
             return True
+        elif code == 400:
+            raise BadRequest("Bad Request")
         elif code == 401:
             raise NotAuthorized("API: Unauthorized")
         elif code == 403:
@@ -274,7 +276,7 @@ class APISession(object):
         try:
             self.check_status_code(response.status_code)
         except Exception as err:
-            raise APIError(err, response.text)
+            raise APIError(err, response.text, response.status_code) from err
 
         self._response = response.text
         return self

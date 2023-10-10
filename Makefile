@@ -4,7 +4,8 @@ export PROJECT_NAME := $$(basename $$(pwd))
 export PROJECT_VERSION := $(shell cat VERSION)
 
 patch:
-		bumpversion patch
+		bumpversion --allow-dirty patch
+		git commit -am "Version $(shell cat VERSION)"
 		git push
 minor:
 		bumpversion minor

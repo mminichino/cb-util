@@ -11,6 +11,7 @@ from .cb_connect import CBConnect
 from .util import r_getattr, omit_path, copy_path
 from .config import UpsertMapConfig, MapUpsertType
 from .cb_capella import Capella
+from .httpsessionmgr import APISession
 from datetime import timedelta
 import attr
 import hashlib
@@ -38,6 +39,18 @@ class CBManager(CBConnect):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def mgmt_api_post(self, endpoint, data):
+        s = APISession(self.username, self.password)
+        s.set_host(self.rally_host_name, self.ssl, self.admin_port)
+        response = s.api_post(endpoint, data)
+        return response
+
+    def mgmt_api_get(self, endpoint):
+        s = APISession(self.username, self.password)
+        s.set_host(self.rally_host_name, self.ssl, self.admin_port)
+        response = s.api_get(endpoint).json()
+        return response
 
     def connect_cluster(self) -> CBManager:
         self._cluster = self.session()

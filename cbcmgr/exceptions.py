@@ -21,7 +21,8 @@ class CBException(Exception):
 
 class APIException(Exception):
 
-    def __init__(self, message, response):
+    def __init__(self, message, response, code):
+        self.code = code
         try:
             self.body = json.loads(response)
         except json.decoder.JSONDecodeError:
@@ -348,4 +349,8 @@ class CapellaError(CBException):
 
 
 class APIError(APIException):
+    pass
+
+
+class BadRequest(CBException):
     pass

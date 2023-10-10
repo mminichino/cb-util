@@ -1,15 +1,27 @@
 ##
 ##
-from __future__ import annotations
 
+from __future__ import annotations
 import attr
 import logging
 import json
 import jinja2
+from enum import Enum
+from typing import Optional, Union
 from jinja2.meta import find_undeclared_variables
 from attr.validators import instance_of as io
 from cbcmgr.cli.exceptions import SchemaFileError
 import cbcmgr.cli.config as config
+
+
+class EnumEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Enum):
+            return obj.value
+        elif attr.has(obj):
+            # noinspection PyTypeChecker
+            return attr.asdict(obj)
+        return json.JSONEncoder.default(self, obj)
 
 
 @attr.s
@@ -100,19 +112,38 @@ class RuleList(object):
 
 
 @attr.s
+class API(object):
+    endpoint: Optional[str] = attr.ib(default=None)
+    data: Optional[Union[dict, list]] = attr.ib(default=None)
+
+    @classmethod
+    def build(cls, endpoint: str, data: Union[dict, list]):
+        return cls(
+            endpoint,
+            data
+        )
+
+
+@attr.s
 class Bucket(object):
-    name = attr.ib(validator=io(str))
-    scopes = attr.ib(validator=io(list))
+    name: Optional[str] = attr.ib(default=None)
+    scopes: Optional[list] = attr.ib(default=None)
+    api: Optional[API] = attr.ib(default=None)
 
     @classmethod
     def build(cls, name: str):
         return cls(
             ProcessVariables.resolve_variables(name),
-            []
+            [],
+            None
         )
 
     def add_scope(self, scope: Scope):
         self.scopes.append(scope)
+        return self
+
+    def add_api(self, api: API):
+        self.api = api
         return self
 
     @property
@@ -268,8 +299,14 @@ class ProcessSchema(object):
                 schema_builder = Schema.build(schema)
                 for bucket in entry[schema].get("buckets", []):
                     bucket_name = bucket.get("name")
-                    bucket_scopes = bucket.get("scopes")
+                    bucket_scopes = bucket.get("scopes", [])
+                    bucket_api = bucket.get("api")
                     bucket_builder = Bucket.build(bucket_name)
+                    if bucket_api:
+                        api_endpoint = bucket_api.get("endpoint")
+                        api_data = bucket_api.get("data")
+                        api_builder = API.build(api_endpoint, api_data)
+                        bucket_builder.add_api(api_builder)
                     for scope in bucket_scopes:
                         scope_name = scope.get("name")
                         scope_collections = scope.get("collections")
