@@ -1,9 +1,6 @@
-.PHONY:	setup push pypi build patch minor major test_sync_drv test_async_drv test_cbc_cli test_random test_sgw_cli
+.PHONY:	setup push pypi patch minor major test_sync_drv test_async_drv test_cbc_cli test_random test_sgw_cli
 export PYTHONPATH := $(shell pwd)/tests:$(shell pwd):$(PYTHONPATH)
 
-build:
-		bumpversion build
-		git push
 patch:
 		bumpversion patch
 		git push
