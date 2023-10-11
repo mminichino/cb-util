@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text()
 setup(
     name='cbcmgr',
     version=cbcmgr.__version__,
-    packages=['cbcmgr'],
+    packages=['cbcmgr', 'cbcmgr.cli', 'cbcmgr.api'],
     url='https://github.com/mminichino/cb-util',
     license='MIT License',
     author='Michael Minichino',
@@ -20,7 +20,7 @@ setup(
     package_data={'cbcmgr': ['data/*']},
     install_requires=[
         "attrs>=22.2.0",
-        "couchbase==4.1.5",
+        "couchbase>=4.1.8",
         "dnspython>=2.3.0",
         "docker>=5.0.3",
         "pytest>=7.0.1",
