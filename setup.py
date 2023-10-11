@@ -15,6 +15,8 @@ setup(
     entry_points={
         'console_scripts': [
             'cbcutil = cbcmgr.cli.cbcutil:main',
+            'caputil = cbcmgr.cli.caputil:main',
+            'sgwutil = cbcmgr.cli.sgwutil:main',
         ]
     },
     package_data={'cbcmgr': ['data/*']},

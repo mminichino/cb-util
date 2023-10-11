@@ -3,16 +3,15 @@ export PYTHONPATH := $(shell pwd)/tests:$(shell pwd):$(PYTHONPATH)
 export PROJECT_NAME := $$(basename $$(pwd))
 export PROJECT_VERSION := $(shell cat VERSION)
 
-patch:
-		bumpversion --allow-dirty patch
+commit:
 		git commit -am "Version $(shell cat VERSION)"
 		git push
+patch:
+		bumpversion --allow-dirty patch
 minor:
-		bumpversion minor
-		git push
+		bumpversion --allow-dirty minor
 major:
-		bumpversion major
-		git push
+		bumpversion --allow-dirty major
 setup:
 		python setup.py sdist
 push:
