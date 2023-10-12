@@ -261,7 +261,7 @@ Delete database "sgwdb":
 sgwutil database delete -h hostname -n sgwdb
 ```
 ## caputil
-Note: Save Capella v4 token file as $HOME/.capella/default-api-key-token.txt
+Note: Save Capella v4 token file as $HOME/.capella/default-api-key-token.txt\
 Create Capella cluster:
 ```
 caputil cluster create --project project-name --name testdb --region us-east-1
