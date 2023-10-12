@@ -3,7 +3,7 @@ import docker
 
 
 def pytest_addoption(parser):
-    parser.addoption("--host", action="store", default="localhost")
+    parser.addoption("--host", action="store", default="127.0.0.1")
     parser.addoption("--bucket", action="store", default="test")
     parser.addoption("--external", action="store_true")
 
@@ -56,7 +56,7 @@ def pytest_sessionstart(session):
                                          )
 
     print("Container started")
-    print("Waiting for container startup")
+    print("Waiting for Couchbase Server to be ready")
 
     while True:
         exit_code, output = container_id.exec_run(['/bin/bash',
@@ -65,8 +65,7 @@ def pytest_sessionstart(session):
         if exit_code == 0:
             break
 
-    print("Waiting for Couchbase Server to be ready")
-    exit_code, output = container_id.exec_run(['/demo/couchbase/cbperf/bin/cb_perf',
+    exit_code, output = container_id.exec_run(['cbcutil',
                                                'list',
                                                '--host', '127.0.0.1',
                                                '--wait'])

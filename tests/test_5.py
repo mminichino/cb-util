@@ -36,7 +36,7 @@ def data_load(request):
     client = docker.from_env()
     container_id = client.containers.get('pytest')
     print("Creating test buckets and loading data")
-    exit_code, output = container_id.exec_run(['/demo/couchbase/cbperf/bin/cb_perf',
+    exit_code, output = container_id.exec_run(['cbcutil',
                                                'load',
                                                '--host', '127.0.0.1',
                                                '--count', '30',
@@ -47,7 +47,7 @@ def data_load(request):
     for line in output.split(b'\n'):
         print(line.decode("utf-8"))
     assert exit_code == 0
-    exit_code, output = container_id.exec_run(['/demo/couchbase/cbperf/bin/cb_perf',
+    exit_code, output = container_id.exec_run(['cbcutil',
                                                'load',
                                                '--host', '127.0.0.1',
                                                '--schema', 'insurance_sample',
@@ -62,14 +62,14 @@ def data_load(request):
     yield exit_code
 
     print("Removing test buckets")
-    exit_code, output = container_id.exec_run(['/demo/couchbase/cbperf/bin/cb_perf',
+    exit_code, output = container_id.exec_run(['cbcutil',
                                                'clean',
                                                '--host', '127.0.0.1',
                                                '--schema', 'employee_demo'])
     for line in output.split(b'\n'):
         print(line.decode("utf-8"))
     assert exit_code == 0
-    exit_code, output = container_id.exec_run(['/demo/couchbase/cbperf/bin/cb_perf',
+    exit_code, output = container_id.exec_run(['cbcutil',
                                                'clean',
                                                '--host', '127.0.0.1',
                                                '--schema', 'insurance_sample'])
