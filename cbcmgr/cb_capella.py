@@ -200,6 +200,49 @@ class CapellaCluster:
 
 
 @attr.s
+class CapellaClusterUpdate:
+    name: Optional[str] = attr.ib(default=None)
+    description: Optional[str] = attr.ib(default=None)
+    support: Optional[Support] = attr.ib(default=None)
+    serviceGroups: Optional[List[ServiceGroup]] = attr.ib(default=[])
+
+    @classmethod
+    def create(cls, name, description, plan=SupportPlan.devpro, timezone=SupportTZ.western_us):
+        return cls(
+            name,
+            description,
+            Support(plan, timezone),
+            [],
+        )
+
+    def add_service_group(self, cloud, machine_type, storage=256, quantity=3, services=None):
+        if not services:
+            services = ["data", "index", "query"]
+        cpu, memory = machine_type.split('x')
+        if cloud == "aws":
+            size = storage
+            iops = next((aws_storage_matrix[s] for s in aws_storage_matrix if s >= storage), None)
+            s_type = "gp3"
+        elif cloud == "azure":
+            size, s_type = next(((s, azure_storage_matrix[s]) for s in azure_storage_matrix if s >= storage), None)
+            iops = None
+        else:
+            size = storage
+            s_type = None
+            iops = None
+        self.serviceGroups.append(
+            ServiceGroup(
+                NodeConfig(
+                    ComputeConfig(int(cpu), int(memory)),
+                    StorageConfig(size, s_type, iops)
+                ),
+                quantity,
+                services
+            )
+        )
+
+
+@attr.s
 class AllowedCIDR:
     cidr: Optional[str] = attr.ib(default='0.0.0.0/0')
 
@@ -405,6 +448,15 @@ class Capella(APISession):
                 else:
                     raise CapellaError(f"Can not create Capella database: {err} message: {err.body.get('message', '')}")
 
+    def update_cluster(self, updates: CapellaClusterUpdate):
+        cluster = self.get_cluster(updates.name)
+        if cluster:
+            cluster_id = cluster.get('id')
+            # noinspection PyTypeChecker
+            parameters = attrs.asdict(updates)
+            results = self.api_put(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}", body=parameters)
+            return results
+
     def wait_for_cluster(self, name, retry_count=120, state="healthy"):
         for retry_number in range(retry_count + 1):
             cluster = self.get_cluster(name)
@@ -475,6 +527,14 @@ class Capella(APISession):
             return results.get('id')
         except APIError as err:
             raise CapellaError(f"Can not add database user: {err} message: {err.body.get('message', '')}")
+
+    def change_db_user_password(self, cluster_id: str, username: str, password: str):
+        user_settings = self.get_db_user(cluster_id, username)
+        if user_settings:
+            user_id = user_settings.get('id')
+            parameters = dict(password=password)
+            results = self.api_put(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users/{user_id}", parameters)
+            return results
 
     def get_bucket(self, cluster_id: str, bucket: str):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets").json()

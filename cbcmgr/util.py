@@ -1,6 +1,7 @@
 ##
 ##
 
+import getpass
 import functools
 import copy
 import multiprocessing
@@ -18,9 +19,9 @@ def omit_path(data: dict, keys: list):
         if k in keys:
             del data[k]
             continue
-        if type(d[k]) == dict:
+        if type(d[k]) is dict:
             omit_path(data[k], keys)
-        if type(d[k]) == list:
+        if type(d[k]) is list:
             for elem in d[k]:
                 omit_path(elem, keys)
     return data
@@ -35,6 +36,19 @@ def copy_path(path: str, data: dict):
             return copy_path('.'.join(parts[1:]), data[parts[0]])
     elif len(parts) == 1:
         return {}
+
+
+def ask_for_password():
+    while True:
+        pass_answer = getpass.getpass(prompt="Password: ")
+        pass_answer = pass_answer.rstrip("\n")
+
+        check_answer = getpass.getpass(prompt="Re-enter password: ")
+        check_answer = check_answer.rstrip("\n")
+        if pass_answer == check_answer:
+            return pass_answer
+        else:
+            print("[!] Passwords do not match, please try again ...")
 
 
 class MPValue(object):

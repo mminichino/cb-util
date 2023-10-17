@@ -64,6 +64,11 @@ class CBSession(object):
         self.sw_version = None
         self.memory_quota = None
         self.cluster_services = []
+        self.memory_quota = 0
+        self.index_memory_quota = 0
+        self.fts_memory_quota = 0
+        self.cbas_memory_quota = 0
+        self.eventing_memory_quota = 0
         self.auth = PasswordAuthenticator(self.username, self.password)
         self.timeouts = ClusterTimeoutOptions(query_timeout=timedelta(seconds=query_timeout),
                                               kv_timeout=timedelta(seconds=kv_timeout),
@@ -109,7 +114,7 @@ class CBSession(object):
         return cluster
 
     def construct_key(self, key):
-        if type(key) == int or str(key).isdigit():
+        if type(key) is int or str(key).isdigit():
             if self._collection.name != "_default":
                 return self._collection.name + ':' + str(key)
             else:
@@ -198,6 +203,12 @@ class CBSession(object):
                     logger.debug(f"external address {rally_ip} detected")
                     self.use_external_network = True
 
+        self.memory_quota = self.cluster_info.get('memoryQuota', 0)
+        self.index_memory_quota = self.cluster_info.get('indexMemoryQuota', 0)
+        self.fts_memory_quota = self.cluster_info.get('ftsMemoryQuota', 0)
+        self.cbas_memory_quota = self.cluster_info.get('cbasMemoryQuota', 0)
+        self.eventing_memory_quota = self.cluster_info.get('eventingMemoryQuota', 0)
+
     @retry(retry_count=5)
     def check_node_connectivity(self, hostname, port):
         try:
@@ -260,6 +271,15 @@ class CBSession(object):
                 for key in ext_port_list:
                     print("%s:%s" % (key, ext_port_list[key]), end=' ')
             print("[Services] %s [version] %s [platform] %s" % (services, version, ostype))
+
+    def get_quota_settings(self):
+        return dict(
+            data=self.memory_quota,
+            index=self.index_memory_quota,
+            fts=self.fts_memory_quota,
+            analytics=self.cbas_memory_quota,
+            eventing=self.eventing_memory_quota
+        )
 
     def key_format(self,
                    style: KeyStyle,

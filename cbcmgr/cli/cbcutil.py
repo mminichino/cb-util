@@ -75,7 +75,9 @@ class CBCUtil(CLI):
         opt_parser.add_argument('--wait', action='store_true', help='Wait for cluster to be ready')
 
         command_subparser = self.parser.add_subparsers(dest='command')
-        command_subparser.add_parser('list', help="List Nodes", parents=[opt_parser], add_help=False)
+        list_parser = command_subparser.add_parser('list', help="List Nodes", parents=[opt_parser], add_help=False)
+        list_subparser = list_parser.add_subparsers(dest='list_command')
+        list_subparser.add_parser('quota', help="Show quotas", parents=[opt_parser], add_help=False)
         command_subparser.add_parser('clean', help="Clean Up", parents=[opt_parser], add_help=False)
         command_subparser.add_parser('load', help="Load Data", parents=[opt_parser], add_help=False)
         command_subparser.add_parser('get', help="Get Data", parents=[opt_parser], add_help=False)
@@ -97,7 +99,10 @@ class CBCUtil(CLI):
         config.process_params(self.options)
 
         if self.options.command == 'list':
-            MainLoop().cluster_list()
+            if self.options.list_command == 'quota':
+                MainLoop().display_quota_settings()
+            else:
+                MainLoop().cluster_list()
         elif self.options.command == 'schema':
             MainLoop().schema_list()
         elif self.options.command == 'clean':

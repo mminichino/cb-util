@@ -20,7 +20,7 @@ from cbcmgr.cli.schema import Bucket, Scope, Collection
 from cbcmgr.cli.schema import ProcessSchema, CollectionDoc, EnumEncoder
 from cbcmgr.cli.keyformat import KeyStyle, KeyFormat
 from cbcmgr.cb_bucket import Bucket as CouchbaseBucket
-from cbcmgr.exceptions import APIError, BadRequest
+from cbcmgr.exceptions import APIError
 
 
 class MainLoop(object):
@@ -120,6 +120,16 @@ class MainLoop(object):
                 print("Cluster Status:")
                 db.cluster_health_check(output=True, restrict=False)
 
+    @staticmethod
+    def display_quota_settings():
+        db = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db)
+        quota_settings = db.get_quota_settings()
+        print(f"Data: {quota_settings.get('data')}")
+        print(f"Index: {quota_settings.get('index')}")
+        print(f"FTS: {quota_settings.get('fts')}")
+        print(f"Analytics: {quota_settings.get('analytics')}")
+        print(f"Eventing: {quota_settings.get('eventing')}")
+
     def api_load(self, endpoint: str, data: str):
         dbm = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db)
         try:
@@ -181,7 +191,7 @@ class MainLoop(object):
         tasks = set()
         schema_list: List[CollectionDoc]
 
-        if type(collection.schema) == list:
+        if type(collection.schema) is list:
             schema_list = collection.schema
         else:
             schema_list = [collection.schema]

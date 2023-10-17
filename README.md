@@ -1,4 +1,4 @@
-# cb-util 2.1.5
+# cb-util 2.1.6
 
 ## Couchbase Utilities
 Couchbase connection manager. Simplifies connecting to a Couchbase cluster and performing data and management operations.
@@ -266,7 +266,19 @@ Create Capella cluster:
 ```
 caputil cluster create --project project-name --name testdb --region us-east-1
 ```
+Update Capella cluster (to add services):
+```
+caputil cluster update --project pytest-name --name testdb --services search,analytics,eventing
+```
 Delete Capella cluster:
 ```
 caputil cluster delete --project project-name --name testdb --region us-east-1
+```
+Create bucket:
+````
+caputil bucket create --project project-name --db testdb --name test-bucket
+````
+Change database user password:
+```
+caputil user password --project pytest-name --db testdb --name Administrator
 ```
