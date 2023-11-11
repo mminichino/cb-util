@@ -134,31 +134,32 @@ Usage: cbcutil command options
 | schema   | Schema management options |
 | replicate| Replicate configuration   |
 
-| Option                                 | Description                                                   |
-|----------------------------------------|---------------------------------------------------------------|
-| -u USER, --user USER                   | User Name                                                     |
-| -p PASSWORD, --password PASSWORD       | User Password                                                 |
-| -h HOST, --host HOST                   | Cluster Node or Domain Name                                   |
-| -b BUCKET, --bucket BUCKET             | Bucket name                                                   |
-| -s SCOPE, --scope SCOPE                | Scope name                                                    |
-| -c COLLECTION, --collection COLLECTION | Collection name                                               |
-| -k KEY, --key KEY                      | Key name or pattern                                           |
-| -d DATA, --data DATA                   | Data to import                                                |
-| -F FILTER, --filter FILTER             | Filter expression (i.e. bucket:regex, user:regex, etc.)       |
-| --project PROJECT                      | Capella project name                                          |
-| --db DATABASE                          | Capella database name                                         |
-| -q, --quiet                            | Quiet mode (only necessary output)                            |
-| -O, --stdout                           | Output exported data to the terminal                          |
-| -i, --index                            | Create a primary index for export operations (if not present) |
-| --tls                                  | Enable SSL (default)                                          |
-| -e, --external                         | Use external network for clusters with an external network    |
-| --schema SCHEMA                        | Schema name                                                   |
-| --count COUNT                          | Record Count                                                  |
-| --file FILE                            | File mode schema JSON file                                    |
-| --id ID                                | ID field (for file mode)                                      |
-| --directory DIRECTORY                  | Directory for export operations                               |
-| -P PLUGIN                              | Import plugin                                                 |
-| -V PLUGIN_VARIABLE                     | Pass variable in form key=value to plugin                     |
+| Option                                 | Description                                                    |
+|----------------------------------------|----------------------------------------------------------------|
+| -u USER, --user USER                   | User Name                                                      |
+| -p PASSWORD, --password PASSWORD       | User Password                                                  |
+| -h HOST, --host HOST                   | Cluster Node or Domain Name                                    |
+| -b BUCKET, --bucket BUCKET             | Bucket name                                                    |
+| -s SCOPE, --scope SCOPE                | Scope name                                                     |
+| -c COLLECTION, --collection COLLECTION | Collection name                                                |
+| -k KEY, --key KEY                      | Key name or pattern                                            |
+| -d DATA, --data DATA                   | Data to import                                                 |
+| -F FILTER, --filter FILTER             | Filter expression (i.e. bucket:regex, user:regex, etc.)        |
+| --project PROJECT                      | Capella project name                                           |
+| --db DATABASE                          | Capella database name                                          |
+| -q, --quiet                            | Quiet mode (only necessary output)                             |
+| -O, --stdout                           | Output exported data to the terminal                           |
+| -i, --index                            | Create a primary index for export operations (if not present)  |
+| --tls                                  | Enable SSL (default)                                           |
+| -e, --external                         | Use external network for clusters with an external network     |
+| --schema SCHEMA                        | Schema name                                                    |
+| --count COUNT                          | Record Count                                                   |
+| --file FILE                            | File mode schema JSON file                                     |
+| --id ID                                | ID field (for file mode)                                       |
+| --directory DIRECTORY                  | Directory for export operations                                |
+| --defer                                | Creates an index as deferred                                   |
+| -P PLUGIN                              | Import plugin                                                  |
+| -V PLUGIN_VARIABLE                     | Pass variable in form key=value to plugin                      |
 
 ## sgwutil
 Database Commands:
