@@ -47,12 +47,13 @@ class EnumEncoder(json.JSONEncoder):
 
 class Replicator(object):
 
-    def __init__(self, filters=None):
+    def __init__(self, filters=None, deferred=True):
         self.output = {}
         if filters:
             self.filters = filters
         else:
             self.filters = []
+        self.deferred = deferred
         self.bucket_filters = []
         self.scope_filters = []
         self.collection_filters = []
@@ -210,7 +211,7 @@ class Replicator(object):
                         for index in index_list:
                             entry = CBQueryIndex.from_dict(index)
                             logger.info(f"Replicating index [{entry.keyspace_id}] {entry.name}")
-                            operator.index_create(entry)
+                            operator.index_create(entry, deferred=self.deferred)
             except Empty:
                 time.sleep(0.1)
                 continue

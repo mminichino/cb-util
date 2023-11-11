@@ -61,6 +61,7 @@ class CBCUtil(CLI):
         opt_parser.add_argument('--docid', action='store', help="Import document ID field", default="doc_id")
         opt_parser.add_argument('--tls', action='store_true', help="Enable SSL")
         opt_parser.add_argument('--safe', action='store_true', help="Do not overwrite data")
+        opt_parser.add_argument('--defer', action='store_true', help="Defer index build")
         opt_parser.add_argument('-e', '--external', action='store_true', help='Use external network')
         opt_parser.add_argument('-f', '--file', action='store', help="File based collection schema JSON")
         opt_parser.add_argument('--outfile', action='store', help="Output file", default="output.dat")
@@ -118,7 +119,7 @@ class CBCUtil(CLI):
             if self.options.replicate_command == 'source':
                 Replicator(self.options.filter).source()
             elif self.options.replicate_command == 'target':
-                Replicator().target()
+                Replicator(deferred=self.options.defer).target()
         else:
             if config.op_mode == OperatingMode.LOAD.value and self.options.schema:
                 MainLoop().schema_load()

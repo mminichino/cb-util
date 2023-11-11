@@ -95,7 +95,7 @@ class CBConnect(CBSession):
         except Exception as err:
             raise BucketStatsError(f"can not get bucket {bucket} stats: {err}")
 
-    @retry(factor=0.5)
+    @retry()
     def bucket_wait(self, bucket: str, count: int = 0):
         try:
             bucket_stats = self.bucket_stats(bucket)
@@ -104,7 +104,7 @@ class CBConnect(CBSession):
         except Exception as err:
             raise BucketWaitException(f"bucket_wait: error: {err}")
 
-    @retry(factor=0.5)
+    @retry()
     def scope_wait(self, bucket: str, scope: str):
         bucket = self._cluster.bucket(bucket)
         cm = bucket.collections()

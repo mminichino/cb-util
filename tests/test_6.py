@@ -8,56 +8,58 @@ from cbcmgr.cb_bucket import Bucket
 warnings.filterwarnings("ignore")
 
 
-def test_capella_1():
-    project = Capella().get_project('pytest-project')
-    project_id = project.get('id')
+class TestCapella(object):
 
-    assert project_id is not None
+    def test_1(self):
+        project = Capella().get_project('pytest-project')
+        project_id = project.get('id')
 
-    cluster = CapellaCluster().create("pytest-cluster", "Pytest created cluster", "aws", "us-east-2")
-    cluster.add_service_group("aws", "4x16")
+        assert project_id is not None
 
-    print("Creating cluster")
-    cluster_id = Capella(project_id=project_id).create_cluster(cluster)
+        cluster = CapellaCluster().create("pytest-cluster", "Pytest created cluster", "aws", "us-east-2")
+        cluster.add_service_group("aws", "4x16")
 
-    assert cluster_id is not None
+        print("Creating cluster")
+        cluster_id = Capella(project_id=project_id).create_cluster(cluster)
 
-    print("Waiting for cluster creation to complete")
-    result = Capella(project_id=project_id).wait_for_cluster("pytest-cluster")
+        assert cluster_id is not None
 
-    assert result is True
+        print("Waiting for cluster creation to complete")
+        result = Capella(project_id=project_id).wait_for_cluster("pytest-cluster")
 
-    cidr = AllowedCIDR().create()
+        assert result is True
 
-    print("Creating allowed CIDR")
-    cidr_id = Capella(project_id=project_id).allow_cidr(cluster_id, cidr)
+        cidr = AllowedCIDR().create()
 
-    assert cidr_id is not None
+        print("Creating allowed CIDR")
+        cidr_id = Capella(project_id=project_id).allow_cidr(cluster_id, cidr)
 
-    credentials = Credentials().create("sysdba", "Passw0rd!")
+        assert cidr_id is not None
 
-    print("Creating database credentials")
-    account_id = Capella(project_id=project_id).add_db_user(cluster_id, credentials)
+        credentials = Credentials().create("sysdba", "Passw0rd!")
 
-    assert account_id is not None
+        print("Creating database credentials")
+        account_id = Capella(project_id=project_id).add_db_user(cluster_id, credentials)
 
-    bucket = Bucket(**dict(
-        name="employees",
-        ram_quota_mb=128
-    ))
+        assert account_id is not None
 
-    print("Creating bucket")
-    bucket_id = Capella(project_id=project_id).add_bucket(cluster_id, bucket)
+        bucket = Bucket(**dict(
+            name="employees",
+            ram_quota_mb=128
+        ))
 
-    assert bucket_id is not None
-    time.sleep(1)
+        print("Creating bucket")
+        bucket_id = Capella(project_id=project_id).add_bucket(cluster_id, bucket)
 
-    print("Deleting bucket")
-    Capella(project_id=project_id).delete_bucket("pytest-cluster", "employees")
+        assert bucket_id is not None
+        time.sleep(1)
 
-    print("Deleting cluster")
-    Capella(project_id=project_id).delete_cluster("pytest-cluster")
-    print("Waiting for cluster deletion to complete")
-    result = Capella(project_id=project_id).wait_for_cluster_delete("pytest-cluster")
+        print("Deleting bucket")
+        Capella(project_id=project_id).delete_bucket("pytest-cluster", "employees")
 
-    assert result is True
+        print("Deleting cluster")
+        Capella(project_id=project_id).delete_cluster("pytest-cluster")
+        print("Waiting for cluster deletion to complete")
+        result = Capella(project_id=project_id).wait_for_cluster_delete("pytest-cluster")
+
+        assert result is True

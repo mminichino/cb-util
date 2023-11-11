@@ -208,7 +208,7 @@ class SGWDatabase(APISession):
             logger.error(f"Resync failed for database {name}: {err}")
             sys.exit(1)
 
-    @retry(factor=0.5, retry_count=20)
+    @retry(retry_count=12)
     def resync_wait(self, name):
         self.api_post(f"/{name}/_online", None)
 
@@ -237,7 +237,7 @@ class SGWDatabase(APISession):
             logger.error(f"Database list failed: {err}")
             sys.exit(1)
 
-    @retry(factor=0.5, retry_count=20)
+    @retry(retry_count=12)
     def ready_wait(self, name):
         self.api_get(f"/{name}/_config").json()
 

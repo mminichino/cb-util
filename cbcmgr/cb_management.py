@@ -168,7 +168,7 @@ class CBManager(CBConnect):
         cluster = Cluster.connect(self.cb_connect_string, self.cluster_options)
         cluster.wait_until_ready(timedelta(seconds=30), WaitUntilReadyOptions(service_types=[ServiceType.Query, ServiceType.Management]))
 
-    @retry(factor=0.5)
+    @retry()
     def wait_for_index_ready(self):
         value = []
         query_str = r"SELECT * FROM system:indexes;"
@@ -425,7 +425,7 @@ class CBManager(CBConnect):
 
         return False
 
-    @retry(factor=0.5, allow_list=(IndexNotReady,))
+    @retry(allow_list=(IndexNotReady,))
     def index_wait(self, index_name: str = None):
         record_count = self.collection_count()
         try:
@@ -482,7 +482,7 @@ class CBManager(CBConnect):
         except WatchQueryIndexTimeoutException:
             raise IndexNotReady(f"Indexes not build within {timeout} seconds...")
 
-    @retry(factor=0.5, allow_list=(IndexNotReady,))
+    @retry(allow_list=(IndexNotReady,))
     def index_list(self):
         return_list = {}
         try:
@@ -494,7 +494,7 @@ class CBManager(CBConnect):
         except Exception as err:
             raise IndexNotReady(f"index_list: bucket {self._bucket.name} error: {err}")
 
-    @retry(factor=0.5, allow_list=(IndexNotReady,))
+    @retry(allow_list=(IndexNotReady,))
     def delete_wait(self, index_name: str = None):
         if self.is_index(index_name=index_name):
             raise IndexNotReady(f"delete_wait: index still exists")

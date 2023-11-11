@@ -142,7 +142,7 @@ class CBSession(object):
         logger.debug(f"Connect string: {connect_string}")
         return connect_string
 
-    @retry(retry_count=5)
+    @retry(retry_count=7)
     def is_reachable(self):
         resolver = dns.resolver.Resolver()
         resolver.timeout = 5
@@ -209,7 +209,7 @@ class CBSession(object):
         self.cbas_memory_quota = self.cluster_info.get('cbasMemoryQuota', 0)
         self.eventing_memory_quota = self.cluster_info.get('eventingMemoryQuota', 0)
 
-    @retry(retry_count=5)
+    @retry(retry_count=7)
     def check_node_connectivity(self, hostname, port):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -226,7 +226,7 @@ class CBSession(object):
         else:
             raise NodeConnectionFailed(f"node {hostname}:{port} unreachable")
 
-    @retry(factor=0.5)
+    @retry()
     def wait_until_ready(self):
         nodes = []
         cluster = Cluster(self.cb_connect_string, ClusterOptions(self.auth,

@@ -185,6 +185,7 @@ class CBOperation(CBConnectLite):
         except CollectionNotFoundException:
             if self.create:
                 self.create_collection(self._bucket, self._scope, name)
+                self._collection_name = name
                 self.reconnect()
                 return self._collection_(name)
         self._collection_name = name

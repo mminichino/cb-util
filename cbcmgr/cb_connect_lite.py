@@ -131,6 +131,13 @@ class CBConnectLite(CBSession):
         return scope.collection(name)
 
     @retry()
+    def collection_wait(self, bucket: Bucket, scope: Scope, name: str = "_default"):
+        if name is None:
+            raise TypeError("name can not be None")
+        if not self.is_collection(bucket, scope.name, name):
+            raise CollectionNotFoundException(f"wait timeout: collection {name} does not exist")
+
+    @retry()
     def create_collection(self, bucket: Bucket, scope: Scope, name: str):
         if name is None:
             raise TypeError("name can not be None")
@@ -140,6 +147,7 @@ class CBConnectLite(CBSession):
                 collection_spec = CollectionSpec(name, scope_name=scope.name)
                 cm = bucket.collections()
                 cm.create_collection(collection_spec)
+                self.collection_wait(bucket, scope, name)
         except CollectionAlreadyExistsException:
             pass
 
@@ -240,8 +248,6 @@ class CBConnectLite(CBSession):
         if self.capella_project and self.capella_db:
             logger.warning("Skipping group creation on Capella")
         else:
-            for role in roles:
-                print(role.as_dict())
             um = self._cluster.users()
             # noinspection PyTypeChecker
             group = Group(name=name, description=description, roles=roles)
@@ -287,13 +293,13 @@ class CBConnectLite(CBSession):
             raise IndexInternalError(f"can not determine index for query")
 
     @retry()
-    def index_create(self, index: CBQueryIndex, timeout: int = 480):
+    def index_create(self, index: CBQueryIndex, timeout: int = 480, deferred: bool = True):
         if index.is_primary:
             index_options = CreatePrimaryQueryIndexOptions()
         else:
             index_options = CreateQueryIndexOptions()
 
-        index_options.update(deferred=True)
+        index_options.update(deferred=deferred)
         index_options.update(timeout=timedelta(seconds=timeout))
         index_options.update(num_replicas=index.num_replica)
         index_options.update(ignore_if_exists=True)

@@ -1,4 +1,4 @@
-# cb-util 2.1.6
+# cb-util 2.1.7
 
 ## Couchbase Utilities
 Couchbase connection manager. Simplifies connecting to a Couchbase cluster and performing data and management operations.
