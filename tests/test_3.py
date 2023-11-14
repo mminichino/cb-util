@@ -13,26 +13,29 @@ current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
 
 
-@pytest.fixture(scope="module", autouse=True)
-def setup(request):
-    print("Starting test container")
-    platform = f"linux/{os.uname().machine}"
-    container_id = start_container(image_name, platform)
-    command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
-    while not run_in_container(container_id, command):
-        time.sleep(1)
-    command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
-    run_in_container(container_id, command)
-
-    yield container_id
-
-    print("Stopping test container")
-    stop_container(container_id)
-
-
-@pytest.mark.parametrize("hostname", ["127.0.0.1"])
+@pytest.mark.serial
 class TestCBCCLI(object):
+    container_id = None
 
+    @classmethod
+    def setup_class(cls):
+        print("Starting test container")
+        platform = f"linux/{os.uname().machine}"
+        cls.container_id = start_container(image_name, platform)
+        command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
+        while not run_in_container(cls.container_id, command):
+            time.sleep(1)
+        command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
+        run_in_container(cls.container_id, command)
+        time.sleep(1)
+
+    @classmethod
+    def teardown_class(cls):
+        print("Stopping test container")
+        stop_container(cls.container_id)
+        time.sleep(1)
+
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_1(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -43,6 +46,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_2(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -53,6 +57,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_3(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -63,6 +68,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_4(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -73,6 +79,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_5(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -83,6 +90,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_6(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -93,6 +101,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_7(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -103,6 +112,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_8(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -113,6 +123,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_9(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -123,6 +134,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_10(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -133,6 +145,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_11(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -143,6 +156,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_12(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -153,6 +167,7 @@ class TestCBCCLI(object):
         assert p.findall(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_13(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -163,6 +178,7 @@ class TestCBCCLI(object):
         assert p.findall(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_14(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -173,6 +189,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_15(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -183,6 +200,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_16(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -193,6 +211,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_17(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -203,6 +222,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_18(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -213,6 +233,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_19(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -223,6 +244,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_20(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -233,6 +255,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_21(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -243,6 +266,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_22(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -253,6 +277,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_23(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'
@@ -263,6 +288,7 @@ class TestCBCCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     def test_cli_24(self, hostname):
         global parent
         cmd = parent + '/tests/test_cli.py'

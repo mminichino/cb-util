@@ -16,29 +16,32 @@ from tests.common import start_container, stop_container, run_in_container, docu
 warnings.filterwarnings("ignore")
 
 
-@pytest.fixture(scope="module", autouse=True)
-def setup(request):
-    print("Starting test container")
-    platform = f"linux/{os.uname().machine}"
-    container_id = start_container(image_name, platform)
-    command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
-    while not run_in_container(container_id, command):
-        time.sleep(1)
-    command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
-    run_in_container(container_id, command)
-
-    yield container_id
-
-    print("Stopping test container")
-    stop_container(container_id)
-
-
-@pytest.mark.parametrize("hostname", ["127.0.0.1"])
-@pytest.mark.parametrize("bucket_name", ["test"])
-@pytest.mark.parametrize("scope_name, collection_name", [("_default", "_default"), ("test", "test")])
-@pytest.mark.parametrize("tls", [False, True])
+@pytest.mark.serial
 class TestAsyncDrv1(object):
+    container_id = None
 
+    @classmethod
+    def setup_class(cls):
+        print("Starting test container")
+        platform = f"linux/{os.uname().machine}"
+        cls.container_id = start_container(image_name, platform)
+        command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
+        while not run_in_container(cls.container_id, command):
+            time.sleep(1)
+        command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
+        run_in_container(cls.container_id, command)
+        time.sleep(1)
+
+    @classmethod
+    def teardown_class(cls):
+        print("Stopping test container")
+        stop_container(cls.container_id)
+        time.sleep(1)
+
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
+    @pytest.mark.parametrize("bucket_name", ["test"])
+    @pytest.mark.parametrize("scope_name, collection_name", [("_default", "_default"), ("test", "test")])
+    @pytest.mark.parametrize("tls", [False, True])
     @pytest.mark.asyncio
     async def test_1(self, hostname, bucket_name, tls, scope_name, collection_name):
         replica_count = 0
@@ -47,7 +50,7 @@ class TestAsyncDrv1(object):
         ca = CBConnectLiteAsync(hostname, "Administrator", "password", ssl=tls)
         cluster = await ca.session_a()
 
-        await ca.create_bucket(cluster, bucket_name, quota=128)
+        await ca.create_bucket(cluster, bucket_name, quota=128, replicas=0)
         bucket = await ca.get_bucket(cluster, bucket_name)
         await ca.create_scope(bucket, scope_name)
         scope = await ca.get_scope(bucket, scope_name)
@@ -70,18 +73,22 @@ class TestAsyncDrv1(object):
         bm = cluster.buckets()
         await bm.drop_bucket(bucket_name)
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
+    @pytest.mark.parametrize("bucket_name", ["test"])
+    @pytest.mark.parametrize("scope_name, collection_name", [("_default", "_default"), ("test", "test")])
+    @pytest.mark.parametrize("tls", [False, True])
     @pytest.mark.asyncio
     async def test_2(self, hostname, bucket_name, tls, scope_name, collection_name):
         keyspace = f"{bucket_name}.{scope_name}.{collection_name}"
         try:
-            opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls)
+            opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls, replicas=0)
             opm = await opc.init()
             col_a = await opm.connect(keyspace)
             col_a.cleanup()
         except (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException):
             pass
 
-        opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls, quota=128, create=True)
+        opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls, quota=128, create=True, replicas=0)
         opm = await opc.init()
         col_a = await opm.connect(keyspace)
 
@@ -96,7 +103,7 @@ class TestAsyncDrv1(object):
 
         await col_a.cleanup()
 
-        opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls, quota=128, create=True)
+        opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls, quota=128, create=True, replicas=0)
         opm = await opc.init()
         col_t = await opm.connect(keyspace)
         a_read = col_t.get_operator(Operation.READ)
@@ -117,16 +124,34 @@ class TestAsyncDrv1(object):
         await col_a.cleanup()
 
 
-@pytest.mark.parametrize("hostname", ["127.0.0.1"])
-@pytest.mark.parametrize("bucket", ["test"])
-@pytest.mark.parametrize("scope", ["_default", "test"])
-@pytest.mark.parametrize("collection", ["test"])
-@pytest.mark.parametrize("tls", [False, True])
+@pytest.mark.serial
 class TestAsyncDrv2(object):
+    container_id = None
 
+    @classmethod
+    def setup_class(cls):
+        print("Starting test container")
+        platform = f"linux/{os.uname().machine}"
+        cls.container_id = start_container(image_name, platform)
+        command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
+        while not run_in_container(cls.container_id, command):
+            time.sleep(1)
+        command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
+        run_in_container(cls.container_id, command)
+
+    @classmethod
+    def teardown_class(cls):
+        print("Stopping test container")
+        stop_container(cls.container_id)
+
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
+    @pytest.mark.parametrize("bucket", ["test"])
+    @pytest.mark.parametrize("scope", ["_default", "test"])
+    @pytest.mark.parametrize("collection", ["test"])
+    @pytest.mark.parametrize("tls", [False, True])
     @pytest.mark.asyncio
     async def test_1(self, hostname, bucket, tls, scope, collection):
-        pool = CBPoolAsync(hostname, "Administrator", "password", ssl=False, quota=128, create=True)
+        pool = CBPoolAsync(hostname, "Administrator", "password", ssl=False, quota=128, create=True, replicas=0)
 
         for n in range(10):
             c = string.ascii_lowercase[n:n + 1]
@@ -147,7 +172,7 @@ class TestAsyncDrv2(object):
             count += await opk.get_count()
         assert count == 10000
 
-        opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls, quota=128, create=True)
+        opc = CBOperationAsync(hostname, "Administrator", "password", ssl=tls, quota=128, create=True, replicas=0)
         opm = await opc.init()
         keyspace = f"{bucket}.{scope}.{collection}"
         col_a = await opm.connect(keyspace)

@@ -20,29 +20,32 @@ from tests.common import start_container, stop_container, run_in_container, docu
 warnings.filterwarnings("ignore")
 
 
-@pytest.fixture(scope="module", autouse=True)
-def setup(request):
-    print("Starting test container")
-    platform = f"linux/{os.uname().machine}"
-    container_id = start_container(image_name, platform)
-    command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
-    while not run_in_container(container_id, command):
-        time.sleep(1)
-    command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
-    run_in_container(container_id, command)
-
-    yield container_id
-
-    print("Stopping test container")
-    stop_container(container_id)
-
-
-@pytest.mark.parametrize("hostname", ["127.0.0.1"])
-@pytest.mark.parametrize("bucket", ["test"])
-@pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
-@pytest.mark.parametrize("tls", [False, True])
+@pytest.mark.serial
 class TestSyncDrv1(object):
+    container_id = None
 
+    @classmethod
+    def setup_class(cls):
+        print("Starting test container")
+        platform = f"linux/{os.uname().machine}"
+        cls.container_id = start_container(image_name, platform)
+        command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
+        while not run_in_container(cls.container_id, command):
+            time.sleep(1)
+        command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
+        run_in_container(cls.container_id, command)
+        time.sleep(1)
+
+    @classmethod
+    def teardown_class(cls):
+        print("Stopping test container")
+        stop_container(cls.container_id)
+        time.sleep(1)
+
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
+    @pytest.mark.parametrize("bucket", ["test"])
+    @pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
+    @pytest.mark.parametrize("tls", [False, True])
     def test_1(self, hostname, bucket, tls, scope, collection):
         replica_count = 0
         bucket_opts = Bucket(**dict(
@@ -100,16 +103,20 @@ class TestSyncDrv1(object):
         dbm.delete_wait(index_name)
         dbm.drop_bucket(bucket)
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
+    @pytest.mark.parametrize("bucket", ["test"])
+    @pytest.mark.parametrize("scope, collection", [("_default", "_default"), ("test", "test")])
+    @pytest.mark.parametrize("tls", [False, True])
     def test_2(self, hostname, bucket, tls, scope, collection):
         keyspace = f"{bucket}.{scope}.{collection}"
         try:
-            opm = CBOperation(hostname, "Administrator", "password", ssl=tls)
+            opm = CBOperation(hostname, "Administrator", "password", ssl=tls, replicas=0)
             col_a = opm.connect(keyspace)
             col_a.cleanup()
         except (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException):
             pass
 
-        col_a = CBOperation(hostname, "Administrator", "password", ssl=tls, quota=128, create=True).connect(keyspace)
+        col_a = CBOperation(hostname, "Administrator", "password", ssl=tls, quota=128, create=True, replicas=0).connect(keyspace)
 
         col_a.put_doc(col_a.collection, "test::1", document)
         d = col_a.get_doc(col_a.collection, "test::1")
@@ -122,7 +129,7 @@ class TestSyncDrv1(object):
 
         col_a.cleanup()
 
-        col_t = CBOperation(hostname, "Administrator", "password", ssl=tls, quota=128, create=True).connect(keyspace)
+        col_t = CBOperation(hostname, "Administrator", "password", ssl=tls, quota=128, create=True, replicas=0).connect(keyspace)
         a_read = col_t.get_operator(Operation.READ)
         a_write = col_t.get_operator(Operation.WRITE)
         a_query = col_t.get_operator(Operation.QUERY)
@@ -141,12 +148,30 @@ class TestSyncDrv1(object):
         col_a.cleanup()
 
 
-@pytest.mark.parametrize("hostname", ["127.0.0.1"])
-@pytest.mark.parametrize("bucket", ["test"])
-@pytest.mark.parametrize("scope", ["_default", "test"])
-@pytest.mark.parametrize("tls", [False, True])
+@pytest.mark.serial
 class TestSyncDrv2(object):
+    container_id = None
 
+    @classmethod
+    def setup_class(cls):
+        print("Starting test container")
+        platform = f"linux/{os.uname().machine}"
+        cls.container_id = start_container(image_name, platform)
+        command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
+        while not run_in_container(cls.container_id, command):
+            time.sleep(1)
+        command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
+        run_in_container(cls.container_id, command)
+
+    @classmethod
+    def teardown_class(cls):
+        print("Stopping test container")
+        stop_container(cls.container_id)
+
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
+    @pytest.mark.parametrize("bucket", ["test"])
+    @pytest.mark.parametrize("scope", ["_default", "test"])
+    @pytest.mark.parametrize("tls", [False, True])
     def test_1(self, hostname, bucket, tls, scope):
         cfg = UpsertMapConfig().new()
         cfg.add('addresses.billing')
@@ -155,11 +180,15 @@ class TestSyncDrv2(object):
                 p_type=MapUpsertType.LIST,
                 id_key="event_id")
 
-        p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=tls, quota=128)
+        p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=tls, quota=128, replicas=0)
         p_map.connect()
         p_map.load_data("testdata", json_data=json.dumps(json_data, indent=2))
         CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
+    @pytest.mark.parametrize("bucket", ["test"])
+    @pytest.mark.parametrize("scope", ["_default", "test"])
+    @pytest.mark.parametrize("tls", [False, True])
     def test_2(self, hostname, bucket, tls, scope):
         cfg = UpsertMapConfig().new()
         cfg.add('root.addresses.billing')
@@ -168,21 +197,39 @@ class TestSyncDrv2(object):
                 p_type=MapUpsertType.LIST,
                 id_key="event_id")
 
-        p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=False, quota=128)
+        p_map = CBPathMap(cfg, hostname, "Administrator", "password", bucket, scope, ssl=False, quota=128, replicas=0)
         p_map.connect()
         p_map.load_data("testdata", xml_data=xml_data)
         CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
 
 
-@pytest.mark.parametrize("hostname", ["127.0.0.1"])
-@pytest.mark.parametrize("bucket", ["test"])
-@pytest.mark.parametrize("scope", ["_default", "test"])
-@pytest.mark.parametrize("collection", ["test"])
-@pytest.mark.parametrize("tls", [False, True])
+@pytest.mark.serial
 class TestSyncDrv3(object):
+    container_id = None
 
+    @classmethod
+    def setup_class(cls):
+        print("Starting test container")
+        platform = f"linux/{os.uname().machine}"
+        cls.container_id = start_container(image_name, platform)
+        command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
+        while not run_in_container(cls.container_id, command):
+            time.sleep(1)
+        command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
+        run_in_container(cls.container_id, command)
+
+    @classmethod
+    def teardown_class(cls):
+        print("Stopping test container")
+        stop_container(cls.container_id)
+
+    @pytest.mark.parametrize("hostname", ["127.0.0.1"])
+    @pytest.mark.parametrize("bucket", ["test"])
+    @pytest.mark.parametrize("scope", ["_default", "test"])
+    @pytest.mark.parametrize("collection", ["test"])
+    @pytest.mark.parametrize("tls", [False, True])
     def test_1(self, hostname, bucket, tls, scope, collection):
-        pool = CBPool(hostname, "Administrator", "password", ssl=tls, quota=128, create=True)
+        pool = CBPool(hostname, "Administrator", "password", ssl=tls, quota=128, create=True, replicas=0)
 
         for n in range(10):
             c = string.ascii_lowercase[n:n + 1]

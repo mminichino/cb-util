@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import warnings
+import pytest
 from cbcmgr.cli.randomize import (rand_init, rand_gender, past_date, dob_date, rand_first_name, rand_last_name, month_value, credit_card, social_security_number, four_digits,
                                   zip_code, account_number, dollar_amount, numeric_sequence, hash_code, address_line, rand_city, rand_state, nick_name, email_address, user_name,
                                   phone_number, boolean_value, date_code, year_value, past_date_slash, past_date_hyphen, past_date_text, dob_slash, dob_hyphen, dob_text, day_value,
@@ -9,6 +10,7 @@ from cbcmgr.cli.randomize import (rand_init, rand_gender, past_date, dob_date, r
 warnings.filterwarnings("ignore")
 
 
+@pytest.mark.serial
 class TestRandomizer(object):
 
     def test_1(self):

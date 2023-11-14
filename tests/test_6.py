@@ -2,12 +2,14 @@
 
 import warnings
 import time
+import pytest
 from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials
 from cbcmgr.cb_bucket import Bucket
 
 warnings.filterwarnings("ignore")
 
 
+@pytest.mark.serial
 class TestCapella(object):
 
     def test_1(self):
