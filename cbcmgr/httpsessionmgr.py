@@ -324,3 +324,18 @@ class APISession(object):
 
         self._response = response.text
         return self
+
+    def api_patch(self, endpoint, body):
+        response = self.session.patch(self.url_prefix + endpoint,
+                                      auth=self.auth_class,
+                                      json=body,
+                                      verify=False,
+                                      timeout=self.timeout)
+
+        try:
+            self.check_status_code(response.status_code)
+        except Exception as err:
+            raise APIError(err, response.text, response.status_code) from err
+
+        self._response = response.text
+        return self

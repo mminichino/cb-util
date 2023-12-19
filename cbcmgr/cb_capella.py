@@ -293,6 +293,36 @@ class Credentials:
         )
 
 
+@attr.s
+class UserOpValue:
+    id: Optional[str] = attr.ib(default=None)
+    type: Optional[str] = attr.ib(default=None)
+    roles: Optional[List[str]] = attr.ib(default=None)
+
+
+@attr.s
+class UserOp:
+    op: Optional[str] = attr.ib(default=None)
+    path: Optional[str] = attr.ib(default=None)
+    value: Optional[UserOpValue] = attr.ib(default=None)
+
+
+@attr.s
+class UserOpList:
+    user_op_list: Optional[List[UserOp]] = attr.ib(default=[])
+
+    def add(self, project_id: str, role: str):
+        opo = UserOp()
+        opo.op = "add"
+        opo.path = f"/resources/{project_id}"
+        opo.value = UserOpValue(id=project_id, type="project", roles=[role])
+        self.user_op_list.append(opo)
+
+    @property
+    def as_dict(self):
+        return list(attrs.asdict(o) for o in self.__dict__["user_op_list"])
+
+
 class NetworkDriver(object):
 
     def __init__(self):
@@ -395,6 +425,16 @@ class Capella(APISession):
 
         return next((o for o in results.get('data', []) if o.get('name') == name), None)
 
+    def list_users(self):
+        results = self.api_get(f"/v4/organizations/{self.organization_id}/users").json()
+
+        return results
+
+    def get_user(self, name: str = None, email: str = None):
+        results = self.api_get(f"/v4/organizations/{self.organization_id}/users").json()
+
+        return next((u for u in results if u.get('name') == name or u.get('email') == email), None)
+
     def list_projects(self):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects").json()
 
@@ -404,6 +444,34 @@ class Capella(APISession):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects").json()
 
         return next((p for p in results if p.get('name') == name), None)
+
+    def create_project(self, name: str, username: str = None, email: str = None):
+        parameters = {"name": name}
+        try:
+            results = self.api_post(f"/v4/organizations/{self.organization_id}/projects", body=parameters).json()
+            project_id = results.get('id')
+            if username is not None or email is not None:
+                self.set_project_owner(project_id, username, email)
+            return project_id
+        except APIError as err:
+            raise CapellaError(f"Can not create project: {err} message: {err.body.get('message', '')}")
+
+    def set_project_owner(self, project_id: str, name: str = None, email: str = None):
+        if name is None and email is None:
+            raise ValueError("Either name or email must be provided")
+        user = self.get_user(name, email)
+        if not user:
+            raise CapellaError("User does not exist")
+
+        user_id = user.get('id')
+        user_op = UserOpList()
+        user_op.add(project_id, "projectOwner")
+        parameters = user_op.as_dict
+
+        try:
+            self.api_patch(f"/v4/organizations/{self.organization_id}/users/{user_id}", body=parameters).json()
+        except APIError as err:
+            raise CapellaError(f"Can not set project ownership: {err} message: {err.body.get('message', '')}")
 
     def list_clusters(self):
         results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters").json()

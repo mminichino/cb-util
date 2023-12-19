@@ -1,6 +1,7 @@
 ##
 ##
 
+import json
 import argparse
 import warnings
 from overrides import override
@@ -35,6 +36,7 @@ class CapellaCLI(CLI):
         opt_parser.add_argument('-c', '--cidr', action='store', help="Cluster CIDR", default="10.0.0.0/23")
         opt_parser.add_argument('-m', '--machine', action='store', help="Machine type", default="4x16")
         opt_parser.add_argument('-U', '--user', action='store', help="User Name", default="Administrator")
+        opt_parser.add_argument('-e', '--email', action='store', help="User Email")
         opt_parser.add_argument('-P', '--password', action='store', help="User Password")
         opt_parser.add_argument('-C', '--cloud', action='store', help="Cluster cloud", default="aws")
         opt_parser.add_argument('-R', '--region', action='store', help="Cloud region", default="us-east-1")
@@ -57,6 +59,7 @@ class CapellaCLI(CLI):
         project_subparser = project_parser.add_subparsers(dest='project_command')
         project_subparser.add_parser('get', help="Get project info", parents=[opt_parser], add_help=False)
         project_subparser.add_parser('list', help="List projects", parents=[opt_parser], add_help=False)
+        project_subparser.add_parser('owner', help="Set project owner", parents=[opt_parser], add_help=False)
         org_parser = command_subparser.add_parser('org', help="Cluster Operations", parents=[opt_parser], add_help=False)
         org_subparser = org_parser.add_subparsers(dest='org_command')
         org_subparser.add_parser('get', help="Get organization info", parents=[opt_parser], add_help=False)
@@ -66,9 +69,13 @@ class CapellaCLI(CLI):
         bucket_subparser.add_parser('create', help="Create bucket", parents=[opt_parser], add_help=False)
         bucket_subparser.add_parser('delete', help="Delete bucket", parents=[opt_parser], add_help=False)
         bucket_subparser.add_parser('list', help="List buckets", parents=[opt_parser], add_help=False)
+        credential_parser = command_subparser.add_parser('credential', help="DB Credential Operations", parents=[opt_parser], add_help=False)
+        credential_subparser = credential_parser.add_subparsers(dest='credential_command')
+        credential_subparser.add_parser('password', help="Change password", parents=[opt_parser], add_help=False)
         user_parser = command_subparser.add_parser('user', help="User Operations", parents=[opt_parser], add_help=False)
         user_subparser = user_parser.add_subparsers(dest='user_command')
-        user_subparser.add_parser('password', help="Change password", parents=[opt_parser], add_help=False)
+        user_subparser.add_parser('get', help="Get user", parents=[opt_parser], add_help=False)
+        user_subparser.add_parser('list', help="List users", parents=[opt_parser], add_help=False)
 
     def create_cluster(self, project_id: str):
         cluster_name = self.options.name
@@ -195,6 +202,13 @@ class CapellaCLI(CLI):
             else:
                 logger.error("Password does not meet complexity requirements")
 
+    def set_project_owner(self, project_id: str):
+        username = self.options.name
+        email = self.options.email
+
+        logger.info(f"Setting ownership of project")
+        Capella().set_project_owner(project_id, username, email)
+
     def run(self):
         logger.info("CapUtil version %s" % VERSION)
         cm = Capella()
@@ -263,6 +277,10 @@ class CapellaCLI(CLI):
                 elif self.options.bucket_command == "list":
                     print(pd.DataFrame(subset_df).to_string())
         elif self.options.command == 'project':
+            if self.options.project_command == "owner":
+                self.set_project_owner(project_id)
+                return
+
             data = cm.list_projects()
             df = pd.json_normalize(data)
             subset_df = df[["id", "name", "audit.createdAt", "description"]]
@@ -284,13 +302,23 @@ class CapellaCLI(CLI):
                     print(result)
             elif self.options.org_command == "list":
                 print(pd.DataFrame(subset_df).to_string())
-        elif self.options.command == 'user':
+        elif self.options.command == 'credential':
             if not project_id:
                 logger.error(f"Can not find project {self.options.project}")
                 return
 
-            if self.options.user_command == "password":
+            if self.options.credential_command == "password":
                 self.change_password(project_id)
+        elif self.options.command == 'user':
+            if self.options.user_command == "get":
+                result = cm.get_user(self.options.name, self.options.email)
+                if result:
+                    print(json.dumps(result, indent=2))
+            elif self.options.user_command == "list":
+                data = cm.list_users()
+                df = pd.json_normalize(data)
+                subset_df = df[["id", "name", "email"]]
+                print(pd.DataFrame(subset_df).to_string())
 
 
 def main(args=None):
