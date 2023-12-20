@@ -266,6 +266,19 @@ class APISession(object):
         self._response = response_text
         return self
 
+    def capella_get(self, endpoint):
+        page = 1
+        items = []
+        while True:
+            url = f"{self.url_prefix}{endpoint}?page={page}&perPage=100"
+            response = self.session.get(url, auth=self.auth_class, verify=False, timeout=self.timeout)
+            response_json = json.loads(response.text)
+            items.extend(response_json.get('data'))
+            page = response_json.get('cursor', {}).get('pages', {}).get('next', 0)
+            if page == 0:
+                break
+        return items
+
     def api_post(self, endpoint, body):
         response = self.session.post(self.url_prefix + endpoint,
                                      auth=self.auth_class,

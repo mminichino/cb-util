@@ -431,7 +431,7 @@ class Capella(APISession):
         return results
 
     def get_user(self, name: str = None, email: str = None):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/users").json()
+        results = self.capella_get(f"/v4/organizations/{self.organization_id}/users")
 
         return next((u for u in results if u.get('name') == name or u.get('email') == email), None)
 
