@@ -138,11 +138,13 @@ class TestAsyncDrv2(object):
             time.sleep(1)
         command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
         run_in_container(cls.container_id, command)
+        time.sleep(1)
 
     @classmethod
     def teardown_class(cls):
         print("Stopping test container")
         stop_container(cls.container_id)
+        time.sleep(1)
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])
@@ -151,7 +153,7 @@ class TestAsyncDrv2(object):
     @pytest.mark.parametrize("tls", [False, True])
     @pytest.mark.asyncio
     async def test_1(self, hostname, bucket, tls, scope, collection):
-        pool = CBPoolAsync(hostname, "Administrator", "password", ssl=False, quota=128, create=True, replicas=0)
+        pool = CBPoolAsync(hostname, "Administrator", "password", ssl=tls, quota=128, create=True, replicas=0)
 
         for n in range(10):
             c = string.ascii_lowercase[n:n + 1]

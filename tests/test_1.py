@@ -162,11 +162,13 @@ class TestSyncDrv2(object):
             time.sleep(1)
         command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
         run_in_container(cls.container_id, command)
+        time.sleep(1)
 
     @classmethod
     def teardown_class(cls):
         print("Stopping test container")
         stop_container(cls.container_id)
+        time.sleep(1)
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])
@@ -217,11 +219,13 @@ class TestSyncDrv3(object):
             time.sleep(1)
         command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
         run_in_container(cls.container_id, command)
+        time.sleep(1)
 
     @classmethod
     def teardown_class(cls):
         print("Stopping test container")
         stop_container(cls.container_id)
+        time.sleep(1)
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])

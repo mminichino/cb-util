@@ -82,7 +82,7 @@ class CBPoolAsync(object):
 
     async def join(self):
         if len(self.tasks) > 0:
-            await asyncio.sleep(0)
+            await asyncio.sleep(1)
             results = await asyncio.gather(*self.tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
