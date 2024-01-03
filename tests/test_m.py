@@ -22,109 +22,11 @@ from cbcmgr.cb_operation_s import CBOperation, Operation
 from cbcmgr.mt_pool import CBPool
 from cbcmgr.config import UpsertMapConfig, MapUpsertType, KeyStyle
 from cbcmgr.cb_pathmap import CBPathMap
-from conftest import pytest_sessionstart, pytest_sessionfinish
+from tests.common import start_container, stop_container, run_in_container, get_container_id, document, new_document, query_result, json_data, xml_data, image_name
 
 logger = logging.getLogger()
 
 warnings.filterwarnings("ignore")
-document = {
-    "id": 1,
-    "data": "data",
-    "one": "one",
-    "two": "two",
-    "three": "tree"
-}
-new_document = {
-    "id": 1,
-    "data": "new",
-    "one": "one",
-    "two": "two",
-    "three": "tree"
-}
-query_result = [
-    {
-        'data': 'data'
-    }
-]
-
-json_data = {
-            "name": "John Doe",
-            "email": "jdoe@example.com",
-            "addresses": {
-                "billing": {
-                    "line1": "123 Any Street",
-                    "line2": "Anywhere",
-                    "country": "United States"
-                },
-                "delivery": {
-                    "line1": "123 Any Street",
-                    "line2": "Anywhere",
-                    "country": "United States"
-                }
-            },
-            "history": {
-                "events": [
-                    {
-                        "event_id": "1",
-                        "date": "1/1/1970",
-                        "type": "contact"
-                    },
-                    {
-                        "event_id": "2",
-                        "date": "1/1/1970",
-                        "type": "contact"
-                    }
-                ]
-            },
-            "purchases": {
-                "complete": [
-                    339, 976, 442, 777
-                ],
-                "abandoned": [
-                    157, 42, 999
-                ]
-            }
-        }
-
-xml_data = """<?xml version="1.0" encoding="UTF-8" ?>
-<root>
-  <name>John Doe</name>
-  <email>jdoe@example.com</email>
-  <addresses>
-    <billing>
-      <line1>123 Any Street</line1>
-      <line2>Anywhere</line2>
-      <country>United States</country>
-    </billing>
-    <delivery>
-      <line1>123 Any Street</line1>
-      <line2>Anywhere</line2>
-      <country>United States</country>
-    </delivery>
-  </addresses>
-  <history>
-    <events>
-      <event_id>1</event_id>
-      <date>1/1/1970</date>
-      <type>contact</type>
-    </events>
-    <events>
-      <event_id>2</event_id>
-      <date>1/1/1970</date>
-      <type>contact</type>
-    </events>
-  </history>
-  <purchases>
-    <complete>339</complete>
-    <complete>976</complete>
-    <complete>442</complete>
-    <complete>777</complete>
-    <abandoned>157</abandoned>
-    <abandoned>42</abandoned>
-    <abandoned>999</abandoned>
-  </purchases>
-</root>
-"""
 
 
 class Params(object):
@@ -152,11 +54,22 @@ class Params(object):
 
 
 def container_start():
-    pytest_sessionstart(None)
+    print("Starting test container")
+    platform = f"linux/{os.uname().machine}"
+    container_id = start_container(image_name, platform)
+    command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
+    while not run_in_container(container_id, command):
+        time.sleep(1)
+    command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
+    run_in_container(container_id, command)
+    time.sleep(1)
 
 
 def container_stop():
-    pytest_sessionfinish(None, 0)
+    print("Stopping test container")
+    container_id = get_container_id()
+    stop_container(container_id)
+    time.sleep(1)
 
 
 def manual_1(hostname, bucket_name, tls, scope, collection):
