@@ -125,8 +125,8 @@ class APISession(object):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.url_prefix = "http://127.0.0.1"
         self.session = requests.Session()
-        retries = Retry(total=60,
-                        backoff_factor=0.2)
+        retries = Retry(total=10,
+                        backoff_factor=0.01)
         self.session.mount('http://', HTTPAdapter(max_retries=retries))
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
         self._response = None

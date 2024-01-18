@@ -35,6 +35,8 @@ test_sgw_cli:
 		python -m pytest tests/test_5.py
 test_capella:
 		python -m pytest tests/test_6.py
+test_rest:
+		python -m pytest tests/test_7.py
 test:
 		python -m pytest \
 		tests/test_1.py \
