@@ -1,8 +1,16 @@
 ##
 ##
 
+import logging
 import platform
 import os
+try:
+    import resource as res
+except ImportError:
+    res = None
+
+logger = logging.getLogger('cbcmgr.cli.system')
+logger.addHandler(logging.NullHandler())
 
 
 class SysInfo(object):
@@ -52,3 +60,27 @@ class SysInfo(object):
             return int(value)
         else:
             return None
+
+    @staticmethod
+    def raise_nofile(nofile=4096):
+        if res is None:
+            return
+
+        soft, hard = res.getrlimit(res.RLIMIT_NOFILE)
+
+        if soft < nofile:
+            soft = nofile
+
+            if hard < soft:
+                hard = soft
+
+            logger.debug(f"setting ulimit file descriptors {soft} {hard}")
+            try:
+                res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
+            except (ValueError, res.error):
+                try:
+                    hard = soft
+                    logger.debug(f"trouble with max limit, retrying with soft,hard {soft},{hard}")
+                    res.setrlimit(res.RLIMIT_NOFILE, (soft, hard))
+                except Exception as err:
+                    logger.error(f"failed to raise descriptor ulimit: {err}")

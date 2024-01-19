@@ -10,6 +10,7 @@ from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundExceptio
 from cbcmgr.cb_connect_lite_a import CBConnectLiteAsync
 from cbcmgr.cb_operation_a import CBOperationAsync, Operation
 from cbcmgr.async_pool import CBPoolAsync
+from cbcmgr.cli.system import SysInfo
 from tests.common import start_container, stop_container, run_in_container, document, image_name
 
 
@@ -22,6 +23,7 @@ class TestAsyncDrv1(object):
 
     @classmethod
     def setup_class(cls):
+        SysInfo().raise_nofile()
         print("Starting test container")
         platform = f"linux/{os.uname().machine}"
         cls.container_id = start_container(image_name, platform)
@@ -130,6 +132,7 @@ class TestAsyncDrv2(object):
 
     @classmethod
     def setup_class(cls):
+        SysInfo().raise_nofile()
         print("Starting test container")
         platform = f"linux/{os.uname().machine}"
         cls.container_id = start_container(image_name, platform)

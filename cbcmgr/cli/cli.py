@@ -11,6 +11,7 @@ import inspect
 import traceback
 from cbcmgr.cli import constants as C
 import cbcmgr.cli.config as config
+from cbcmgr.cli.system import SysInfo
 
 warnings.filterwarnings("ignore")
 logger = logging.getLogger()
@@ -103,6 +104,7 @@ class CLI(object):
         signal.signal(signal.SIGINT, break_signal_handler)
         default_debug_file = os.path.join(config.home_dir, f"{os.path.splitext(os.path.basename(sys.argv[0]))[0]}.log")
         debug_file = os.environ.get("DEBUG_FILE", default_debug_file)
+        SysInfo().raise_nofile()
         self.args = args
         self.parser = None
         self.options = None

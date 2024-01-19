@@ -14,6 +14,7 @@ from cbcmgr.config import UpsertMapConfig, MapUpsertType
 from cbcmgr.cb_operation_s import CBOperation, Operation
 from cbcmgr.cb_pathmap import CBPathMap
 from cbcmgr.mt_pool import CBPool
+from cbcmgr.cli.system import SysInfo
 from tests.common import start_container, stop_container, run_in_container, document, new_document, query_result, json_data, xml_data, image_name
 
 
@@ -26,6 +27,7 @@ class TestSyncDrv1(object):
 
     @classmethod
     def setup_class(cls):
+        SysInfo().raise_nofile()
         print("Starting test container")
         platform = f"linux/{os.uname().machine}"
         cls.container_id = start_container(image_name, platform)
@@ -154,6 +156,7 @@ class TestSyncDrv2(object):
 
     @classmethod
     def setup_class(cls):
+        SysInfo().raise_nofile()
         print("Starting test container")
         platform = f"linux/{os.uname().machine}"
         cls.container_id = start_container(image_name, platform)
@@ -211,6 +214,7 @@ class TestSyncDrv3(object):
 
     @classmethod
     def setup_class(cls):
+        SysInfo().raise_nofile()
         print("Starting test container")
         platform = f"linux/{os.uname().machine}"
         cls.container_id = start_container(image_name, platform)
