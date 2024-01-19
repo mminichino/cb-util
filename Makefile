@@ -44,4 +44,5 @@ test:
 		tests/test_3.py \
 		tests/test_4.py \
 		tests/test_5.py \
-		tests/test_6.py
+		tests/test_6.py \
+		tests/test_7.py

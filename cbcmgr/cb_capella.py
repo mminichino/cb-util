@@ -4,7 +4,6 @@
 import json
 import logging
 import attr
-import os
 import re
 import time
 from typing import Optional, List, Union
@@ -16,9 +15,10 @@ import random
 from itertools import cycle
 from ipaddress import IPv4Network
 from couchbase.management.users import Role
-from cbcmgr.httpsessionmgr import APISession, AuthType
 from cbcmgr.exceptions import CapellaError, APIError
 from cbcmgr.cb_bucket import Bucket
+from cbcmgr.cb_capella_config import CapellaConfigFile
+from cbcmgr.restmgr import RESTManager
 
 logger = logging.getLogger('cbcmgr.capella')
 logger.addHandler(logging.NullHandler())
@@ -364,28 +364,26 @@ class NetworkDriver(object):
         return self.active_network.exploded
 
 
-class Capella(APISession):
+class Capella(object):
 
-    def __init__(self, *args, organization_id=None, project_id=None, **kwargs):
-        super().__init__(*args, auth_type=AuthType.capella, **kwargs)
+    def __init__(self, organization_id=None, project_id=None, profile='default'):
+        self.rest = RESTManager(profile=profile)
+        self.cf = CapellaConfigFile(profile)
+
         self._cluster_id = None
         self._cluster_name = None
+
         self.organization_id = organization_id
         self.project_id = project_id
 
-        if 'CAPELLA_API_URL' in os.environ:
-            self._api_host = os.environ['CAPELLA_API_URL']
-        else:
-            self._api_host = "cloudapi.cloud.couchbase.com"
-
-        self.set_host(self._api_host, ssl=APISession.HTTPS)
-
         if not self.organization_id:
-            orgs = self.list_organizations()
-            try:
-                self.organization_id = orgs[0].get('id')
-            except IndexError:
-                raise CapellaError("please provide an organization ID (unable to automatically determine default ID")
+            if self.cf.organization:
+                self.organization_id = self.rest.get_capella('/v4/organizations').by_name(self.cf.organization).unique().id()
+            else:
+                self.organization_id = self.rest.get_capella('/v4/organizations').item(0).id()
+
+        if self.cf.project:
+            self.project_id = self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects").by_name(self.cf.project).unique().id()
 
     @staticmethod
     def valid_password(password: str):
@@ -414,52 +412,36 @@ class Capella(APISession):
                 return password
 
     def list_organizations(self):
-        organizations = []
-        results = self.api_get(f"/v4/organizations").json()
-        for entry in results.get('data', []):
-            organizations.append(entry)
-        return organizations
+        return self.rest.get_capella('/v4/organizations').list()
 
     def get_organization(self, name: str):
-        results = self.api_get(f"/v4/organizations").json()
-
-        return next((o for o in results.get('data', []) if o.get('name') == name), None)
+        return self.rest.get_capella('/v4/organizations').by_name(name).unique().record()
 
     def list_users(self):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/users").json()
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/users").list()
 
-        return results
-
-    def get_user(self, name: str = None, email: str = None):
-        results = self.capella_get(f"/v4/organizations/{self.organization_id}/users")
-
-        return next((u for u in results if u.get('name') == name or u.get('email') == email), None)
+    def get_user(self, email: str):
+        return self.rest.get_capella_kv(f"/v4/organizations/{self.organization_id}/users", "email", email).item(0).record()
 
     def list_projects(self):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects").json()
-
-        return results
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects").list()
 
     def get_project(self, name: str):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects").json()
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects").by_name(name).unique().record()
 
-        return next((p for p in results if p.get('name') == name), None)
-
-    def create_project(self, name: str, username: str = None, email: str = None):
+    def create_project(self, name: str, email: str = None):
+        account_email = email if email else self.cf.account_email if self.cf.account_email else None
         parameters = {"name": name}
         try:
-            results = self.api_post(f"/v4/organizations/{self.organization_id}/projects", body=parameters).json()
-            project_id = results.get('id')
-            if username is not None or email is not None:
-                self.set_project_owner(project_id, username, email)
+            project_id = self.rest.post_capella(f"/v4/organizations/{self.organization_id}/projects", parameters).id()
+            if account_email is not None:
+                self.set_project_owner(project_id, account_email)
             return project_id
         except APIError as err:
             raise CapellaError(f"Can not create project: {err} message: {err.body.get('message', '')}")
 
-    def set_project_owner(self, project_id: str, name: str = None, email: str = None):
-        if name is None and email is None:
-            raise ValueError("Either name or email must be provided")
-        user = self.get_user(name, email)
+    def set_project_owner(self, project_id: str, email: str = None):
+        user = self.get_user(email)
         if not user:
             raise CapellaError("User does not exist")
 
@@ -469,19 +451,15 @@ class Capella(APISession):
         parameters = user_op.as_dict
 
         try:
-            self.api_patch(f"/v4/organizations/{self.organization_id}/users/{user_id}", body=parameters).json()
+            self.rest.patch_capella(f"/v4/organizations/{self.organization_id}/users/{user_id}", parameters)
         except APIError as err:
             raise CapellaError(f"Can not set project ownership: {err} message: {err.body.get('message', '')}")
 
     def list_clusters(self):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters").json()
-
-        return results
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters").list()
 
     def get_cluster(self, name):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters").json()
-
-        return next((c for c in results if c.get('name') == name), None)
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters").by_name(name).unique().record()
 
     def create_cluster(self, cluster: CapellaCluster):
         cidr_util = NetworkDriver()
@@ -502,10 +480,9 @@ class Capella(APISession):
 
         while True:
             try:
-                results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters", body=parameters).json()
-                return results.get('id')
-            except APIError as err:
-                match = re.search(r"The provided CIDR of .* is not unique within this organization", err.body.get('message', ''))
+                return self.rest.post_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters", parameters).id()
+            except RuntimeError as err:
+                match = re.search(r"The provided CIDR of .* is not unique within this organization", str(err))
                 if match:
                     logger.debug(f"Provided CIDR {cluster.cloudProvider.cidr} is in use in the organization")
                     network_cidr = next(subnet_cycle)
@@ -514,7 +491,7 @@ class Capella(APISession):
                     parameters = attrs.asdict(cluster)
                     logger.debug(f"Trying new CIDR {network_cidr}")
                 else:
-                    raise CapellaError(f"Can not create Capella database: {err} message: {err.body.get('message', '')}")
+                    raise CapellaError(f"Can not create Capella database: {err}")
 
     def update_cluster(self, updates: CapellaClusterUpdate):
         cluster = self.get_cluster(updates.name)
@@ -522,8 +499,7 @@ class Capella(APISession):
             cluster_id = cluster.get('id')
             # noinspection PyTypeChecker
             parameters = attrs.asdict(updates)
-            results = self.api_put(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}", body=parameters)
-            return results
+            return self.rest.put_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}", parameters).record()
 
     def wait_for_cluster(self, name, retry_count=120, state="healthy"):
         for retry_number in range(retry_count + 1):
@@ -551,13 +527,11 @@ class Capella(APISession):
         cluster = self.get_cluster(cluster_name)
         if cluster:
             cluster_id = cluster.get('id')
-            results = self.api_delete(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}")
-            return results
+            return self.rest.delete_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}")
 
     def get_allowed_cidr(self, cluster_id: str, cidr: str):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/allowedcidrs").json()
-
-        return next((c for c in results if c.get('cidr') == cidr), None)
+        return (self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/allowedcidrs")
+                .filter('cidr', cidr).unique().record())
 
     def allow_cidr(self, cluster_id: str, cidr: AllowedCIDR):
         response = self.get_allowed_cidr(cluster_id, cidr.cidr)
@@ -570,15 +544,12 @@ class Capella(APISession):
         logger.debug(f"allow_cidr: org_id = {self.organization_id} project_id = {self.project_id} cluster_id = {cluster_id}")
 
         try:
-            results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/allowedcidrs", body=parameters).json()
-            return results.get('id')
-        except APIError as err:
-            raise CapellaError(f"Can not add database allowed CIDR: {err} message: {err.body.get('message', '')}")
+            return self.rest.post_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/allowedcidrs", parameters).id()
+        except Exception as err:
+            raise CapellaError(f"Can not add database allowed CIDR: {err}")
 
-    def get_db_user(self, cluster_id: str, username: str):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users").json()
-
-        return next((u for u in results if u.get('name') == username), None)
+    def get_db_user(self, cluster_id: str, name: str):
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users").by_name(name).unique().record()
 
     def add_db_user(self, cluster_id: str, credentials: Credentials):
         response = self.get_db_user(cluster_id, credentials.name)
@@ -591,28 +562,22 @@ class Capella(APISession):
         logger.debug(f"add_db_user: org_id = {self.organization_id} project_id = {self.project_id} cluster_id = {cluster_id}")
 
         try:
-            results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users", body=parameters).json()
-            return results.get('id')
-        except APIError as err:
-            raise CapellaError(f"Can not add database user: {err} message: {err.body.get('message', '')}")
+            return self.rest.post_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users", parameters).id()
+        except Exception as err:
+            raise CapellaError(f"Can not add database user: {err}")
 
     def change_db_user_password(self, cluster_id: str, username: str, password: str):
         user_settings = self.get_db_user(cluster_id, username)
         if user_settings:
             user_id = user_settings.get('id')
             parameters = dict(password=password)
-            results = self.api_put(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users/{user_id}", parameters)
-            return results
+            return self.rest.put_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/users/{user_id}", parameters)
 
-    def get_bucket(self, cluster_id: str, bucket: str):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets").json()
-
-        return next((b for b in results.get('data', []) if b.get('name') == bucket), None)
+    def get_bucket(self, cluster_id: str, name: str):
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets").by_name(name).unique().record()
 
     def list_buckets(self, cluster_id: str):
-        results = self.api_get(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets").json()
-
-        return results
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets").list()
 
     def add_bucket(self, cluster_id: str, bucket: Bucket):
         response = self.get_bucket(cluster_id, bucket.name)
@@ -635,8 +600,7 @@ class Capella(APISession):
         logger.debug(f"add_bucket: org_id = {self.organization_id} project_id = {self.project_id} cluster_id = {cluster_id}")
 
         try:
-            results = self.api_post(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets", body=parameters).json()
-            return results.get('id')
+            return self.rest.post_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets", parameters).id()
         except APIError as err:
             raise CapellaError(f"Can not add bucket: {err} message: {err.body.get('message', '')}")
 
@@ -647,5 +611,4 @@ class Capella(APISession):
             bucket = self.get_bucket(cluster_id, bucket_name)
             if bucket:
                 bucket_id = bucket.get('id')
-                results = self.api_delete(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets/{bucket_id}")
-                return results
+                return self.rest.delete_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets/{bucket_id}")

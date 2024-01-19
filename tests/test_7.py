@@ -5,6 +5,7 @@ import logging
 import time
 import pytest
 from cbcmgr.restmgr import RESTManager
+from cbcmgr.cb_capella_config import CapellaConfigFile
 
 warnings.filterwarnings("ignore")
 logger = logging.getLogger()
@@ -16,10 +17,13 @@ class TestRESTManager(object):
 
     @classmethod
     def setup_class(cls):
-        cls.api_host = "cloudapi.cloud.couchbase.com"
+        logging.basicConfig()
+        logger.setLevel(logging.DEBUG)
 
     def test_1(self):
-        rest = RESTManager(self.api_host)
+        profile = 'default'
+        rest = RESTManager(profile=profile)
+        cf = CapellaConfigFile(profile)
         org_id = rest.get_capella('/v4/organizations').item(0).id()
 
         start_time = time.perf_counter_ns()
@@ -34,8 +38,16 @@ class TestRESTManager(object):
         time_diff = end_time - start_time
         print(f"Item: {result} in {time_diff / 1000000}: OK")
 
+        start_time = time.perf_counter_ns()
+        result = rest.get_capella_kv(f"/v4/organizations/{org_id}/users", "email", cf.account_email).item(0).record()
+        end_time = time.perf_counter_ns()
+        time_diff = end_time - start_time
+        print(f"Item: {result.get('name')} in {time_diff / 1000000}: OK")
+
     def test_2(self):
-        rest = RESTManager(self.api_host, key_file="pytest-project-api-key-token.txt")
+        profile = 'pytest'
+        rest = RESTManager(profile=profile)
+        cf = CapellaConfigFile(profile)
         org_id = rest.get_capella('/v4/organizations').item(0).key('id')
 
         start_time = time.perf_counter_ns()
@@ -49,3 +61,9 @@ class TestRESTManager(object):
         end_time = time.perf_counter_ns()
         time_diff = end_time - start_time
         print(f"Items: {result} in {time_diff / 1000000}: OK")
+
+        start_time = time.perf_counter_ns()
+        result = rest.get_capella_kv(f"/v4/organizations/{org_id}/users", "email", cf.account_email).item(0).record()
+        end_time = time.perf_counter_ns()
+        time_diff = end_time - start_time
+        print(f"Item: {result.get('name')} in {time_diff / 1000000}: OK")

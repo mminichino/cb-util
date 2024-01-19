@@ -4,16 +4,16 @@
 import logging
 import math
 import json
-import os
 import requests
 import warnings
 import base64
 import asyncio
-from typing import Union
+from typing import Union, List
 from requests.adapters import HTTPAdapter, Retry
 from requests.auth import AuthBase
 from aiohttp import ClientSession
 from cbcmgr.retry import retry
+from cbcmgr.cb_capella_config import CapellaConfigFile
 
 logger = logging.getLogger('cbcmgr.restmgr')
 logger.addHandler(logging.NullHandler())
@@ -23,33 +23,10 @@ logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 
 class CapellaAuth(AuthBase):
 
-    def __init__(self, key_file: Union[str, None] = None):
-        _key_file = key_file if key_file is not None else "default-api-key-token.txt"
-        _credential_file = os.path.join(os.environ['HOME'], '.capella', key_file)
-        _profile_token = None
-        _profile_key_id = None
-        self.profile_token = None
-        self.profile_key_id = None
+    def __init__(self, key_id: str, token: str):
+        self.profile_key_id = key_id
+        self.profile_token = token
 
-        if os.path.exists(_credential_file):
-            try:
-                credential_data = dict(line.split(':', 1) for line in open(_credential_file))
-                _profile_token = credential_data.get('APIKeyToken')
-                if _profile_token:
-                    _profile_token = _profile_token.strip()
-                    _profile_key_id = credential_data.get('APIKeyId', '').strip()
-            except Exception as err:
-                raise Exception(f"can not read credential file {_credential_file}: {err}")
-
-        if 'CAPELLA_TOKEN' in os.environ:
-            self.profile_token = os.environ['CAPELLA_TOKEN']
-        elif _profile_token:
-            self.profile_token = _profile_token
-            self.profile_key_id = _profile_key_id
-        else:
-            raise Exception("Please set Capella Token for Capella API access (for example in $HOME/.capella/default-api-key-token.txt)")
-
-        logger.debug(f"APIKeyId: {self.profile_key_id}")
         self.request_headers = {
             "Authorization": f"Bearer {self.profile_token}",
         }
@@ -86,14 +63,14 @@ class BasicAuth(AuthBase):
 class RESTManager(object):
 
     def __init__(self,
-                 hostname: str,
+                 hostname: Union[str, None] = None,
                  username: Union[str, None] = None,
                  password: Union[str, None] = None,
                  token: Union[str, None] = None,
                  ssl: bool = True,
                  verify: bool = True,
                  port: Union[int, None] = None,
-                 key_file: Union[str, None] = None):
+                 profile: Union[str, None] = None):
         warnings.filterwarnings("ignore")
         self.hostname = hostname
         self.username = username
@@ -103,7 +80,6 @@ class RESTManager(object):
         self.verify = verify
         self.port = port
         self.scheme = 'https' if self.ssl else 'http'
-        self.key_file = key_file if key_file is not None else "default-api-key-token.txt"
         self.response_text = None
         self.response_list = []
         self.response_dict = {}
@@ -113,8 +89,14 @@ class RESTManager(object):
         if self.username is not None and self.password is not None:
             self.auth_class = BasicAuth(self.username, self.password)
         else:
-            logger.debug(f"Using Capella key file: {self.key_file}")
-            self.auth_class = CapellaAuth(self.key_file)
+            cf = CapellaConfigFile(profile)
+            cf.read_token()
+            logger.debug(f"Using Capella auth: key ID: {cf.key_id}")
+            self.hostname = cf.api_host
+            self.auth_class = CapellaAuth(cf.key_id, cf.token)
+
+        if not self.hostname:
+            self.hostname = '127.0.0.1'
 
         self.request_headers = self.auth_class.get_header()
         self.session = requests.Session()
@@ -137,11 +119,37 @@ class RESTManager(object):
         self.response_code = response.status_code
         return self
 
+    def post(self, url: str, body: dict):
+        response = self.session.post(url, auth=self.auth_class, json=body, verify=self.verify)
+        self.response_text = response.text
+        self.response_code = response.status_code
+        return self
+
+    def patch(self, url: str, body: dict):
+        response = self.session.patch(url, auth=self.auth_class, json=body, verify=self.verify)
+        self.response_text = response.text
+        self.response_code = response.status_code
+        return self
+
+    def put(self, url: str, body: dict):
+        response = self.session.put(url, auth=self.auth_class, json=body, verify=self.verify)
+        self.response_text = response.text
+        self.response_code = response.status_code
+        return self
+
+    def delete(self, url: str):
+        response = self.session.delete(url, auth=self.auth_class, verify=self.verify)
+        self.response_text = response.text
+        self.response_code = response.status_code
+        return self
+
     def validate(self):
         if self.response_code >= 300:
             try:
                 response_json = json.loads(self.response_text)
                 message = f"Can not access Capella API: Response Code: {self.response_code}"
+                if 'message' in response_json:
+                    message += f" Message: {response_json['message']}"
                 if 'hint' in response_json:
                     message += f" Hint: {response_json['hint']}"
                 raise RuntimeError(message)
@@ -150,7 +158,17 @@ class RESTManager(object):
         return self
 
     def json(self):
-        return json.loads(self.response_text)
+        try:
+            return json.loads(self.response_text)
+        except json.decoder.JSONDecodeError:
+            return {}
+
+    def as_json(self):
+        try:
+            self.response_dict = json.loads(self.response_text)
+        except json.decoder.JSONDecodeError:
+            self.response_dict = {}
+        return self
 
     def list(self):
         return self.response_list
@@ -177,7 +195,10 @@ class RESTManager(object):
         return self.response_dict.get(key)
 
     def record(self):
-        return self.response_dict
+        if self.response_dict:
+            return self.response_dict
+        else:
+            return None
 
     def by_name(self, name: str):
         self.response_list = [item for item in self.response_list if item.get('name') == name]
@@ -206,6 +227,9 @@ class RESTManager(object):
 
     def page_url(self, endpoint: str, page: int, per_page: int) -> str:
         return f"{self.url_prefix}/{endpoint}?page={page}&perPage={per_page}"
+
+    def build_url(self, endpoint: str) -> str:
+        return f"{self.url_prefix}/{endpoint}"
 
     async def get_async(self, url: str):
         async with ClientSession(headers=self.request_headers) as session:
@@ -251,9 +275,41 @@ class RESTManager(object):
         self.response_list = data
 
     def get_capella(self, endpoint: str):
+        self.response_list = []
+        self.response_dict = {}
         self.loop.run_until_complete(self.get_capella_a(endpoint))
         return self
 
     def get_capella_kv(self, endpoint: str, key: str, value: str):
+        self.response_list = []
+        self.response_dict = {}
         self.loop.run_until_complete(self.get_capella_kv_a(endpoint, key, value))
+        return self
+
+    def post_capella(self, endpoint: str, body: dict):
+        self.response_list = []
+        self.response_dict = {}
+        url = self.build_url(endpoint)
+        self.response_dict = self.post(url, body).validate().json()
+        return self
+
+    def patch_capella(self, endpoint: str, body: Union[dict, List[dict]]):
+        self.response_list = []
+        self.response_dict = {}
+        url = self.build_url(endpoint)
+        self.response_dict = self.patch(url, body).validate().json()
+        return self
+
+    def put_capella(self, endpoint: str, body: Union[dict, List[dict]]):
+        self.response_list = []
+        self.response_dict = {}
+        url = self.build_url(endpoint)
+        self.response_dict = self.put(url, body).validate().json()
+        return self
+
+    def delete_capella(self, endpoint: str):
+        self.response_list = []
+        self.response_dict = {}
+        url = self.build_url(endpoint)
+        self.response_dict = self.delete(url).validate().json()
         return self
