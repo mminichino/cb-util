@@ -60,6 +60,8 @@ class CapellaCLI(CLI):
         project_subparser.add_parser('get', help="Get project info", parents=[opt_parser], add_help=False)
         project_subparser.add_parser('list', help="List projects", parents=[opt_parser], add_help=False)
         project_subparser.add_parser('owner', help="Set project owner", parents=[opt_parser], add_help=False)
+        project_subparser.add_parser('create', help="Create project", parents=[opt_parser], add_help=False)
+        project_subparser.add_parser('delete', help="Delete project", parents=[opt_parser], add_help=False)
         org_parser = command_subparser.add_parser('org', help="Cluster Operations", parents=[opt_parser], add_help=False)
         org_subparser = org_parser.add_subparsers(dest='org_command')
         org_subparser.add_parser('get', help="Get organization info", parents=[opt_parser], add_help=False)
@@ -203,11 +205,26 @@ class CapellaCLI(CLI):
                 logger.error("Password does not meet complexity requirements")
 
     def set_project_owner(self, project_id: str):
-        username = self.options.name
         email = self.options.email
 
         logger.info(f"Setting ownership of project")
-        Capella().set_project_owner(project_id, username, email)
+        Capella().set_project_owner(project_id, email)
+
+    def create_project(self):
+        name = self.options.name
+        email = self.options.email
+
+        project = Capella().get_project(name)
+        if project:
+            logger.info(f"Project {name} already exists.")
+            return
+
+        Capella().create_project(name, email)
+
+    def delete_project(self):
+        name = self.options.name
+
+        Capella().delete_project(name)
 
     def run(self):
         logger.info("CapUtil version %s" % VERSION)
@@ -280,6 +297,12 @@ class CapellaCLI(CLI):
             if self.options.project_command == "owner":
                 self.set_project_owner(project_id)
                 return
+            if self.options.project_command == "create":
+                self.create_project()
+                return
+            if self.options.project_command == "delete":
+                self.delete_project()
+                return
 
             data = cm.list_projects()
             df = pd.json_normalize(data)
@@ -311,7 +334,7 @@ class CapellaCLI(CLI):
                 self.change_password(project_id)
         elif self.options.command == 'user':
             if self.options.user_command == "get":
-                result = cm.get_user(self.options.name, self.options.email)
+                result = cm.get_user(self.options.email)
                 if result:
                     print(json.dumps(result, indent=2))
             elif self.options.user_command == "list":

@@ -221,7 +221,7 @@ class RESTManager(object):
             return None
 
     def unique(self):
-        if len(self.response_list) != 1:
+        if len(self.response_list) > 1:
             raise ValueError("More than one object matches search criteria")
         return self.default()
 

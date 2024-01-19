@@ -15,7 +15,7 @@ import random
 from itertools import cycle
 from ipaddress import IPv4Network
 from couchbase.management.users import Role
-from cbcmgr.exceptions import CapellaError, APIError
+from cbcmgr.exceptions import CapellaError
 from cbcmgr.cb_bucket import Bucket
 from cbcmgr.cb_capella_config import CapellaConfigFile
 from cbcmgr.restmgr import RESTManager
@@ -382,7 +382,7 @@ class Capella(object):
             else:
                 self.organization_id = self.rest.get_capella('/v4/organizations').item(0).id()
 
-        if self.cf.project:
+        if not self.project_id and self.cf.project:
             self.project_id = self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects").by_name(self.cf.project).unique().id()
 
     @staticmethod
@@ -437,8 +437,8 @@ class Capella(object):
             if account_email is not None:
                 self.set_project_owner(project_id, account_email)
             return project_id
-        except APIError as err:
-            raise CapellaError(f"Can not create project: {err} message: {err.body.get('message', '')}")
+        except Exception as err:
+            raise CapellaError(f"Can not create project: {err}")
 
     def set_project_owner(self, project_id: str, email: str = None):
         user = self.get_user(email)
@@ -452,8 +452,17 @@ class Capella(object):
 
         try:
             self.rest.patch_capella(f"/v4/organizations/{self.organization_id}/users/{user_id}", parameters)
-        except APIError as err:
-            raise CapellaError(f"Can not set project ownership: {err} message: {err.body.get('message', '')}")
+        except Exception as err:
+            raise CapellaError(f"Can not set project ownership: {err}")
+
+    def delete_project(self, name: str):
+        project = self.get_project(name)
+        if project:
+            project_id = project.get('id')
+            try:
+                self.rest.delete_capella(f"/v4/organizations/{self.organization_id}/projects/{project_id}")
+            except Exception as err:
+                raise CapellaError(f"Can not delete project: {err}")
 
     def list_clusters(self):
         return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters").list()
@@ -601,8 +610,8 @@ class Capella(object):
 
         try:
             return self.rest.post_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets", parameters).id()
-        except APIError as err:
-            raise CapellaError(f"Can not add bucket: {err} message: {err.body.get('message', '')}")
+        except Exception as err:
+            raise CapellaError(f"Can not add bucket: {err}")
 
     def delete_bucket(self, cluster_name: str, bucket_name: str):
         cluster = self.get_cluster(cluster_name)
