@@ -35,7 +35,8 @@ setup(
         "Jinja2==3.1.2",
         "pandas>=1.5.3",
         "numpy>=1.24.3",
-        "Pillow>=8.4.0"
+        "Pillow>=8.4.0",
+        "aiohttp>=3.9.1"
     ],
     author_email='info@unix.us.com',
     description='Couchbase connection manager',
