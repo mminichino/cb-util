@@ -1,6 +1,7 @@
 ##
 ##
 
+import os
 import logging
 import math
 import json
@@ -14,6 +15,10 @@ from requests.auth import AuthBase
 from aiohttp import ClientSession
 from cbcmgr.retry import retry
 from cbcmgr.cb_capella_config import CapellaConfigFile
+if os.name == 'nt':
+    import certifi_win32
+    os.environ['REQUESTS_CA_BUNDLE'] = certifi_win32.wincerts.where()
+    certifi_win32.generate_pem()
 
 logger = logging.getLogger('cbcmgr.restmgr')
 logger.addHandler(logging.NullHandler())
