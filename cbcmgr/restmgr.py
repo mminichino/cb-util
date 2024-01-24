@@ -92,7 +92,11 @@ class RESTManager(object):
         self.response_list = []
         self.response_dict = {}
         self.response_code = 200
-        self.loop = asyncio.get_event_loop()
+        try:
+            self.loop = asyncio.get_event_loop()
+        except RuntimeError:
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
 
         self.ssl_context = ssl.create_default_context()
         self.ssl_context.load_verify_locations(certifi_where)
