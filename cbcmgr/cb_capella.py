@@ -14,7 +14,6 @@ import string
 import random
 from itertools import cycle
 from ipaddress import IPv4Network
-from couchbase.management.users import Role
 from cbcmgr.exceptions import CapellaError
 from cbcmgr.cb_bucket import Bucket
 from cbcmgr.cb_capella_config import CapellaConfigFile
@@ -49,6 +48,61 @@ azure_storage_matrix = {
     4096: "P50",
     8192: "P60"
 }
+
+
+class Role(object):
+
+    def __init__(self, name=None, bucket=None, scope=None, collection=None):
+        if not name:
+            raise RuntimeError('A role must have a name')
+        self._name = name
+        self._bucket = bucket
+        self._scope = scope
+        self._collection = collection
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def bucket(self) -> str:
+        return self._bucket
+
+    @property
+    def scope(self) -> str:
+        return self._scope
+
+    @property
+    def collection(self) -> str:
+        return self._collection
+
+    def as_dict(self):
+        return {
+            'name': self._name,
+            'bucket': self._bucket,
+            'scope': self._scope,
+            'collection': self._collection
+        }
+
+    def __eq__(self, other):
+        if not isinstance(other, Role):
+            return False
+        return (self.name == other.name
+                and self.bucket == other.bucket
+                and self.scope == other.scope
+                and self.collection == other.collection)
+
+    def __hash__(self):
+        return hash((self.name, self.bucket, self.scope, self.collection))
+
+    @classmethod
+    def create_role(cls, raw_data):
+        return cls(
+            name=raw_data.get("name", None),
+            bucket=raw_data.get("bucket_name", None),
+            scope=raw_data.get("scope_name", None),
+            collection=raw_data.get("collection_name", None)
+        )
 
 
 class NodeAvailability(str, Enum):
@@ -596,11 +650,11 @@ class Capella(object):
         # noinspection PyTypeChecker
         parameters = dict(
             name=bucket.name,
-            type=CapellaBucketType(bucket.bucket_type.value).name,
+            type=bucket.bucket_type.to_server_str,
             storageBackend=bucket.storage_backend.value,
             memoryAllocationInMb=bucket.ram_quota_mb,
             bucketConflictResolution=bucket.conflict_resolution_type.value,
-            durabilityLevel=CapellaDurabilityLevel(bucket.minimum_durability_level.value).name,
+            durabilityLevel=bucket.minimum_durability_level.to_server_str,
             replicas=bucket.num_replicas,
             flush=bucket.flush_enabled,
             timeToLiveInSeconds=bucket.max_ttl

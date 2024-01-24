@@ -4,9 +4,70 @@
 from __future__ import annotations
 from datetime import timedelta
 from typing import Optional
+from enum import IntEnum, Enum
 import attr
-from couchbase.durability import DurabilityLevel
-from couchbase.management.logic.buckets_logic import BucketType, CompressionMode, ConflictResolutionType, EvictionPolicyType, StorageBackend
+
+
+class DurabilityLevel(IntEnum):
+    NONE = 0
+    MAJORITY = 1
+    MAJORITY_AND_PERSIST_TO_ACTIVE = 2
+    PERSIST_TO_MAJORITY = 3
+
+    @property
+    def to_server_str(self):
+        if self.name == 'MAJORITY_AND_PERSIST_TO_ACTIVE':
+            return 'majorityAndPersistActive'
+        elif self.name == 'NONE':
+            return 'none'
+        elif self.name == 'MAJORITY':
+            return 'majority'
+        elif self.name == 'PERSIST_TO_MAJORITY':
+            return 'persistToMajority'
+        else:
+            return 'none'
+
+
+class BucketType(Enum):
+    COUCHBASE = "membase"
+    MEMCACHED = "memcached"
+    EPHEMERAL = "ephemeral"
+
+    @property
+    def to_server_str(self):
+        if self.name == 'COUCHBASE':
+            return 'couchbase'
+        elif self.name == 'MEMCACHED':
+            return 'memcached'
+        elif self.name == 'EPHEMERAL':
+            return 'ephemeral'
+        else:
+            return 'couchbase'
+
+
+class CompressionMode(Enum):
+    OFF = "off"
+    PASSIVE = "passive"
+    ACTIVE = "active"
+
+
+class ConflictResolutionType(Enum):
+    TIMESTAMP = "lww"
+    SEQUENCE_NUMBER = "seqno"
+    CUSTOM = "custom"
+
+
+class EvictionPolicyType(Enum):
+    NOT_RECENTLY_USED = "nruEviction"
+    NO_EVICTION = "noEviction"
+    FULL = "fullEviction"
+    VALUE_ONLY = "valueOnly"
+
+
+class StorageBackend(Enum):
+    UNDEFINED = "undefined"
+    COUCHSTORE = "couchstore"
+    MAGMA = "magma"
 
 
 @attr.s
