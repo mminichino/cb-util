@@ -9,16 +9,19 @@ import requests
 import warnings
 import base64
 import asyncio
+import ssl
 from typing import Union, List
 from requests.adapters import HTTPAdapter, Retry
 from requests.auth import AuthBase
-from aiohttp import ClientSession
+from aiohttp import ClientSession, TCPConnector
 from cbcmgr.retry import retry
 from cbcmgr.cb_capella_config import CapellaConfigFile
 if os.name == 'nt':
     import certifi_win32
-    os.environ['REQUESTS_CA_BUNDLE'] = certifi_win32.wincerts.where()
-    certifi_win32.generate_pem()
+    certifi_where = certifi_win32.wincerts.where()
+else:
+    import certifi
+    certifi_where = certifi.where()
 
 logger = logging.getLogger('cbcmgr.restmgr')
 logger.addHandler(logging.NullHandler())
@@ -72,7 +75,7 @@ class RESTManager(object):
                  username: Union[str, None] = None,
                  password: Union[str, None] = None,
                  token: Union[str, None] = None,
-                 ssl: bool = True,
+                 use_ssl: bool = True,
                  verify: bool = True,
                  port: Union[int, None] = None,
                  profile: Union[str, None] = None):
@@ -81,7 +84,7 @@ class RESTManager(object):
         self.username = username
         self.password = password
         self.token = token
-        self.ssl = ssl
+        self.ssl = use_ssl
         self.verify = verify
         self.port = port
         self.scheme = 'https' if self.ssl else 'http'
@@ -90,6 +93,9 @@ class RESTManager(object):
         self.response_dict = {}
         self.response_code = 200
         self.loop = asyncio.get_event_loop()
+
+        self.ssl_context = ssl.create_default_context()
+        self.ssl_context.load_verify_locations(certifi_where)
 
         if self.username is not None and self.password is not None:
             self.auth_class = BasicAuth(self.username, self.password)
@@ -111,7 +117,7 @@ class RESTManager(object):
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
 
         if not port:
-            if ssl:
+            if use_ssl:
                 self.port = 443
             else:
                 self.port = 80
@@ -237,13 +243,15 @@ class RESTManager(object):
         return f"{self.url_prefix}/{endpoint}"
 
     async def get_async(self, url: str):
-        async with ClientSession(headers=self.request_headers) as session:
+        conn = TCPConnector(ssl_context=self.ssl_context)
+        async with ClientSession(headers=self.request_headers, connector=conn) as session:
             async with session.get(url, verify_ssl=self.verify) as response:
                 response = await response.json()
                 return response.get('data', [])
 
     async def get_kv_async(self, url: str, key: str, value: str):
-        async with ClientSession(headers=self.request_headers) as session:
+        conn = TCPConnector(ssl_context=self.ssl_context)
+        async with ClientSession(headers=self.request_headers, connector=conn) as session:
             async with session.get(url, verify_ssl=self.verify) as response:
                 response = await response.json()
                 return [item for item in response.get('data', []) if item.get(key) == value]

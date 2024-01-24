@@ -37,7 +37,9 @@ setup(
         "numpy>=1.24.3",
         "Pillow>=8.4.0",
         "aiohttp>=3.9.1",
-        "python-certifi-win32>=1.6.1"
+        "python-certifi-win32>=1.6.1",
+        "certifi~=2023.7.22",
+        "setuptools~=65.5.1"
     ],
     author_email='info@unix.us.com',
     description='Couchbase connection manager',
