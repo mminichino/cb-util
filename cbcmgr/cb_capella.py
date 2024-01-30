@@ -525,7 +525,8 @@ class Capella(object):
         return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters").by_name(name).unique().record()
 
     def get_cluster_by_id(self, cluster_id: str):
-        url = f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}"
+        endpoint = f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}"
+        url = self.rest.build_url(endpoint)
         return self.rest.get(url).validate().json()
 
     def create_cluster(self, cluster: CapellaCluster):
