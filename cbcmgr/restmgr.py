@@ -241,10 +241,10 @@ class RESTManager(object):
         return self.default()
 
     def page_url(self, endpoint: str, page: int, per_page: int) -> str:
-        return f"{self.url_prefix}/{endpoint}?page={page}&perPage={per_page}"
+        return f"{self.url_prefix}{endpoint}?page={page}&perPage={per_page}"
 
     def build_url(self, endpoint: str) -> str:
-        return f"{self.url_prefix}/{endpoint}"
+        return f"{self.url_prefix}{endpoint}"
 
     async def get_async(self, url: str):
         conn = TCPConnector(ssl_context=self.ssl_context)
@@ -263,6 +263,7 @@ class RESTManager(object):
     async def get_capella_a(self, endpoint: str):
         data = []
         url = self.page_url(endpoint, 1, 1)
+        logger.debug(f"Capella get {url}")
         cursor = self.get(url).validate().json()
 
         total_items = cursor.get('cursor', {}).get('pages', {}).get('totalItems', 1)

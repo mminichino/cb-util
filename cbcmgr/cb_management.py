@@ -13,7 +13,6 @@ from .config import UpsertMapConfig, MapUpsertType
 from .cb_capella import Capella
 from .httpsessionmgr import APISession
 from datetime import timedelta
-import attr
 import hashlib
 import logging
 import json
@@ -30,6 +29,7 @@ from couchbase.exceptions import (QueryIndexNotFoundException, QueryIndexAlready
 from couchbase.management.queries import (CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions, DropPrimaryQueryIndexOptions, DropQueryIndexOptions)
 from couchbase.management.options import CreateBucketOptions, CreateScopeOptions, CreateCollectionOptions, GetAllQueryIndexOptions
 from couchbase.options import WaitUntilReadyOptions, UpsertOptions
+from couchbase.management.logic.buckets_logic import BucketType, CompressionMode, ConflictResolutionType, EvictionPolicyType
 
 logger = logging.getLogger('cbutil.manager')
 logger.addHandler(logging.NullHandler())
@@ -79,7 +79,18 @@ class CBManager(CBConnect):
                 try:
                     bm = self._cluster.buckets()
                     # noinspection PyTypeChecker
-                    bm.create_bucket(CreateBucketSettings(**attr.asdict(bucket)), CreateBucketOptions(timeout=timedelta(seconds=25)))
+                    bm.create_bucket(CreateBucketSettings(
+                        name=bucket.name,
+                        flush_enabled=bucket.flush_enabled,
+                        replica_index=bucket.replica_index,
+                        ram_quota_mb=bucket.ram_quota_mb,
+                        num_replicas=bucket.num_replicas,
+                        bucket_type=BucketType(bucket.bucket_type.value),
+                        eviction_policy=EvictionPolicyType(bucket.eviction_policy.value),
+                        max_ttl=bucket.max_ttl,
+                        compression_mode=CompressionMode(bucket.compression_mode.value),
+                        conflict_resolution_type=ConflictResolutionType(bucket.conflict_resolution_type.value)
+                    ), CreateBucketOptions(timeout=timedelta(seconds=25)))
                 except BucketAlreadyExistsException:
                     pass
 

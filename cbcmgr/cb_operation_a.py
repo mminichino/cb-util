@@ -140,7 +140,7 @@ class CBOperationAsync(CBConnectLiteAsync):
             self._bucket = await self.get_bucket(self._cluster, name)
         except BucketNotFoundException:
             if self.create:
-                await self.create_bucket(self._cluster, name, self.quota, self.replicas, self.bucket_mode)
+                await self.create_bucket(self._cluster, name, self.quota, self.replicas, 0, False, self.bucket_mode)
                 return await self._bucket_(name)
             else:
                 raise

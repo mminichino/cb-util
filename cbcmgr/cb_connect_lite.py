@@ -10,7 +10,6 @@ from .cb_capella import Capella, Credentials
 from .httpsessionmgr import APISession
 import logging
 import hashlib
-import attr
 from datetime import timedelta
 from typing import Union, Dict, Any, List
 from couchbase.cluster import Cluster
@@ -19,7 +18,7 @@ from couchbase.scope import Scope
 from couchbase.collection import Collection
 from couchbase.options import QueryOptions
 from couchbase.management.users import Role, User, Group
-from couchbase.management.buckets import CreateBucketSettings, BucketType, StorageBackend
+from couchbase.management.buckets import CreateBucketSettings, BucketType, EvictionPolicyType, CompressionMode, ConflictResolutionType
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions
 from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException, BucketAlreadyExistsException, ScopeAlreadyExistsException,
@@ -60,18 +59,18 @@ class CBConnectLite(CBSession):
             raise TypeError("name can not be None")
 
         if mode == BucketMode.DEFAULT:
-            b_type = BucketType.COUCHBASE
-            b_stor = StorageBackend.COUCHSTORE
+            b_type = "membase"
+            b_stor = "couchstore"
         elif mode == BucketMode.CACHE:
-            b_type = BucketType.EPHEMERAL
-            b_stor = StorageBackend.COUCHSTORE
+            b_type = "ephemeral"
+            b_stor = "couchstore"
         else:
-            b_type = BucketType.COUCHBASE
-            b_stor = StorageBackend.MAGMA
+            b_type = "membase"
+            b_stor = "magma"
 
-        logger.debug(f"creating bucket {name} type {b_type.name} storage {b_stor.name} replicas {replicas} quota {quota}")
+        logger.debug(f"creating bucket {name} type {b_type} storage {b_stor} replicas {replicas} quota {quota}")
 
-        bucket_opts = CouchbaseBucket(**dict(
+        bucket_opts = CouchbaseBucket.from_dict(dict(
             name=name,
             ram_quota_mb=quota,
             bucket_type=b_type,
@@ -96,7 +95,18 @@ class CBConnectLite(CBSession):
             try:
                 bm = cluster.buckets()
                 # noinspection PyTypeChecker
-                bm.create_bucket(CreateBucketSettings(**attr.asdict(bucket_opts)))
+                bm.create_bucket(CreateBucketSettings(
+                    name=bucket_opts.name,
+                    flush_enabled=bucket_opts.flush_enabled,
+                    replica_index=bucket_opts.replica_index,
+                    ram_quota_mb=bucket_opts.ram_quota_mb,
+                    num_replicas=bucket_opts.num_replicas,
+                    bucket_type=BucketType(bucket_opts.bucket_type.value),
+                    eviction_policy=EvictionPolicyType(bucket_opts.eviction_policy.value),
+                    max_ttl=bucket_opts.max_ttl,
+                    compression_mode=CompressionMode(bucket_opts.compression_mode.value),
+                    conflict_resolution_type=ConflictResolutionType(bucket_opts.conflict_resolution_type.value)
+                ))
             except BucketAlreadyExistsException:
                 pass
 

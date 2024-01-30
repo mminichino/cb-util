@@ -1,11 +1,12 @@
 ##
 ##
-import asyncio
 
+import asyncio
 from .exceptions import (IndexInternalError, CollectionCountError, BucketStatsError)
 from .retry import retry
 from .cb_session import CBSession, BucketMode
 from .httpsessionmgr import APISession
+from .cb_bucket import Bucket as CouchbaseBucket
 import logging
 import hashlib
 from datetime import timedelta
@@ -14,7 +15,7 @@ from acouchbase.cluster import AsyncCluster
 from acouchbase.bucket import AsyncBucket
 from acouchbase.scope import AsyncScope
 from acouchbase.collection import AsyncCollection
-from couchbase.management.buckets import CreateBucketSettings, BucketType, StorageBackend
+from couchbase.management.buckets import CreateBucketSettings, BucketType, EvictionPolicyType, CompressionMode, ConflictResolutionType
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions
 from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException, BucketAlreadyExistsException, ScopeAlreadyExistsException,
@@ -40,29 +41,47 @@ class CBConnectLiteAsync(CBSession):
         return bucket
 
     @retry()
-    async def create_bucket(self, cluster: AsyncCluster, name: str, quota: int = 256, replicas: int = 0, mode: BucketMode = BucketMode.DEFAULT):
+    async def create_bucket(self, cluster: AsyncCluster, name: str, quota: int = 256, replicas: int = 0, max_ttl: int = 0, flush: bool = False,
+                            mode: BucketMode = BucketMode.DEFAULT):
         if name is None:
             raise TypeError("name can not be None")
 
         if mode == BucketMode.DEFAULT:
-            b_type = BucketType.COUCHBASE
-            b_stor = StorageBackend.COUCHSTORE
+            b_type = "membase"
+            b_stor = "couchstore"
         elif mode == BucketMode.CACHE:
-            b_type = BucketType.EPHEMERAL
-            b_stor = StorageBackend.COUCHSTORE
+            b_type = "ephemeral"
+            b_stor = "couchstore"
         else:
-            b_type = BucketType.COUCHBASE
-            b_stor = StorageBackend.MAGMA
+            b_type = "membase"
+            b_stor = "magma"
 
-        logger.debug(f"creating bucket {name} type {b_type.name} storage {b_stor.name} replicas {replicas} quota {quota}")
+        logger.debug(f"creating bucket {name} type {b_type} storage {b_stor} replicas {replicas} quota {quota}")
+
+        bucket_opts = CouchbaseBucket.from_dict(dict(
+            name=name,
+            ram_quota_mb=quota,
+            bucket_type=b_type,
+            storage_backend=b_stor,
+            num_replicas=replicas,
+            max_ttl=max_ttl,
+            flush_enabled=flush
+        ))
 
         try:
             bm = cluster.buckets()
-            await bm.create_bucket(CreateBucketSettings(name=name,
-                                                        bucket_type=b_type,
-                                                        storage_backend=b_stor,
-                                                        num_replicas=replicas,
-                                                        ram_quota_mb=quota))
+            await bm.create_bucket(CreateBucketSettings(
+                name=bucket_opts.name,
+                flush_enabled=bucket_opts.flush_enabled,
+                replica_index=bucket_opts.replica_index,
+                ram_quota_mb=bucket_opts.ram_quota_mb,
+                num_replicas=bucket_opts.num_replicas,
+                bucket_type=BucketType(bucket_opts.bucket_type.value),
+                eviction_policy=EvictionPolicyType(bucket_opts.eviction_policy.value),
+                max_ttl=bucket_opts.max_ttl,
+                compression_mode=CompressionMode(bucket_opts.compression_mode.value),
+                conflict_resolution_type=ConflictResolutionType(bucket_opts.conflict_resolution_type.value)
+            ))
         except BucketAlreadyExistsException:
             pass
 

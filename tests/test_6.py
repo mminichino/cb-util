@@ -3,14 +3,21 @@
 import warnings
 import time
 import pytest
+import logging
 from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials
 from cbcmgr.cb_bucket import Bucket
 
 warnings.filterwarnings("ignore")
+logger = logging.getLogger()
 
 
 @pytest.mark.serial
 class TestCapella(object):
+
+    @classmethod
+    def setup_class(cls):
+        logging.basicConfig()
+        logger.setLevel(logging.DEBUG)
 
     def test_1(self):
         project = Capella().get_project('pytest-project')
