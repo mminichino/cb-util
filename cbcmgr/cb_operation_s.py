@@ -10,10 +10,9 @@ from couchbase.bucket import Bucket
 from couchbase.scope import Scope
 from couchbase.collection import Collection
 from couchbase.exceptions import (BucketDoesNotExistException, BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException)
-from couchbase.management.buckets import BucketType
 from cbcmgr.cb_session import BucketMode
 from cbcmgr.cb_connect_lite import CBConnectLite
-from cbcmgr.cb_bucket import Bucket as CouchbaseBucket
+from cbcmgr.cb_bucket import Bucket as CouchbaseBucket, BucketType
 
 logger = logging.getLogger('cbutil.operation')
 logger.addHandler(logging.NullHandler())

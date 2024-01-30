@@ -246,6 +246,7 @@ class RESTManager(object):
     def build_url(self, endpoint: str) -> str:
         return f"{self.url_prefix}{endpoint}"
 
+    @retry()
     async def get_async(self, url: str):
         conn = TCPConnector(ssl_context=self.ssl_context)
         async with ClientSession(headers=self.request_headers, connector=conn) as session:
@@ -253,6 +254,7 @@ class RESTManager(object):
                 response = await response.json()
                 return response.get('data', [])
 
+    @retry()
     async def get_kv_async(self, url: str, key: str, value: str):
         conn = TCPConnector(ssl_context=self.ssl_context)
         async with ClientSession(headers=self.request_headers, connector=conn) as session:

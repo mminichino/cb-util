@@ -171,7 +171,7 @@ class CapellaCLI(CLI):
         bucket_quota = self.options.quota
         bucket_replicas = self.options.replicas
         bucket_ttl = self.options.ttl
-        bucket = Bucket(**dict(
+        bucket = Bucket.from_dict(dict(
             name=bucket_name,
             ram_quota_mb=bucket_quota,
             num_replicas=bucket_replicas,
