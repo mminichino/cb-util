@@ -8,7 +8,7 @@ from overrides import override
 from cbcmgr import VERSION
 from cbcmgr.cli.cli import CLI
 from cbcmgr.cli.exceptions import *
-from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials, CapellaClusterUpdate, SupportPlan, SupportTZ
+from cbcmgr.cb_capella import Capella, CapellaCluster, AllowedCIDR, Credentials, CapellaClusterUpdate, SupportPlan, SupportTZ, AppService
 from cbcmgr.cb_bucket import Bucket
 from cbcmgr.util import ask_for_password
 import pandas as pd
@@ -78,6 +78,11 @@ class CapellaCLI(CLI):
         user_subparser = user_parser.add_subparsers(dest='user_command')
         user_subparser.add_parser('get', help="Get user", parents=[opt_parser], add_help=False)
         user_subparser.add_parser('list', help="List users", parents=[opt_parser], add_help=False)
+        app_svc_parser = command_subparser.add_parser('appservice', help="App Service Operations", parents=[opt_parser], add_help=False)
+        app_svc_subparser = app_svc_parser.add_subparsers(dest='app_svc_command')
+        app_svc_subparser.add_parser('create', help="Create App Service", parents=[opt_parser], add_help=False)
+        app_svc_subparser.add_parser('delete', help="Delete App Service", parents=[opt_parser], add_help=False)
+        app_svc_subparser.add_parser('list', help="List App Services", parents=[opt_parser], add_help=False)
 
     def create_cluster(self, project_id: str):
         cluster_name = self.options.name
@@ -226,6 +231,38 @@ class CapellaCLI(CLI):
 
         Capella().delete_project(name)
 
+    def create_app_service(self, project_id: str):
+        database = self.options.db
+        app_svc_name = self.options.name
+        app_svc_machine = self.options.machine
+        app_svc_nodes = self.options.nodes
+
+        cluster = Capella(project_id=project_id).get_cluster(database)
+        if cluster:
+            cluster_id = cluster.get('id')
+
+            app_svc = AppService.create(app_svc_name, "CapUtil generated app service", app_svc_nodes, app_svc_machine, "3.0")
+
+            logger.info("Creating app service")
+            Capella(project_id=project_id).create_app_svc(cluster_id, app_svc)
+
+            logger.info("Waiting for app service creation to complete")
+            Capella(project_id=project_id).wait_for_app_svc(cluster_id)
+
+            logger.info("Done")
+
+    def delete_app_service(self, project_id: str):
+        database = self.options.db
+
+        cluster = Capella(project_id=project_id).get_cluster(database)
+        if cluster:
+            cluster_id = cluster.get('id')
+
+            logger.info(f"Destroying app services for cluster {database}")
+            Capella(project_id=project_id).delete_app_svc(cluster_id)
+            logger.info("Waiting for app service deletion to complete")
+            Capella(project_id=project_id).wait_for_app_svc_delete(cluster_id)
+
     def run(self):
         logger.info("CapUtil version %s" % VERSION)
         cm = Capella()
@@ -341,6 +378,21 @@ class CapellaCLI(CLI):
                 data = cm.list_users()
                 df = pd.json_normalize(data)
                 subset_df = df[["id", "name", "email"]]
+                print(pd.DataFrame(subset_df).to_string())
+        elif self.options.command == 'appservice':
+            if self.options.app_svc_command == "create":
+                self.create_app_service(project_id)
+                return
+            if self.options.app_svc_command == "delete":
+                self.delete_app_service(project_id)
+                return
+
+            pm = Capella(project_id=project_id)
+            data = pm.list_app_svc()
+            df = pd.json_normalize(data)
+            subset_df = df[["id", "name", "nodes", "compute.cpu", "compute.ram"]]
+
+            if self.options.app_svc_command == "list":
                 print(pd.DataFrame(subset_df).to_string())
 
 

@@ -377,6 +377,26 @@ class UserOpList:
         return list(attrs.asdict(o) for o in self.__dict__["user_op_list"])
 
 
+@attr.s
+class AppService:
+    name: Optional[str] = attr.ib(default="AppService")
+    description: Optional[str] = attr.ib(default="Automation Generated App Service")
+    nodes: Optional[int] = attr.ib(default=2)
+    compute: Optional[ComputeConfig] = attr.ib(default=ComputeConfig(2, 4))
+    version: Optional[str] = attr.ib(default="3.0")
+
+    @classmethod
+    def create(cls, name: str, description: str, nodes: int, machine_type: str, version: str):
+        cpu, memory = machine_type.split('x')
+        return cls(
+            name,
+            description,
+            nodes,
+            ComputeConfig(int(cpu), int(memory)),
+            version
+        )
+
+
 class NetworkDriver(object):
 
     def __init__(self):
@@ -680,3 +700,54 @@ class Capella(object):
             if bucket:
                 bucket_id = bucket.get('id')
                 return self.rest.delete_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/buckets/{bucket_id}")
+
+    def list_app_svc(self):
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/appservices").list()
+
+    def get_app_svc(self, cluster_id: str):
+        return self.rest.get_capella(f"/v4/organizations/{self.organization_id}/appservices").filter("clusterId", cluster_id).unique().record()
+
+    def get_app_svc_by_id(self, cluster_id: str, app_svc_id: str):
+        endpoint = f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/appservices/{app_svc_id}"
+        url = self.rest.build_url(endpoint)
+        return self.rest.get(url).validate().json()
+
+    def create_app_svc(self, cluster_id: str, app_svc: AppService):
+        # noinspection PyTypeChecker
+        parameters = attrs.asdict(app_svc)
+
+        response = self.get_app_svc(cluster_id)
+        if response:
+            return response.get('id')
+
+        try:
+            return self.rest.post_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/appservices", parameters).id()
+        except Exception as err:
+            raise CapellaError(f"Can not create Capella app service: {err}")
+
+    def delete_app_svc(self, cluster_id: str):
+        app_svc = self.get_app_svc(cluster_id)
+        app_svc_id = app_svc.get('id')
+        return self.rest.delete_capella(f"/v4/organizations/{self.organization_id}/projects/{self.project_id}/clusters/{cluster_id}/appservices/{app_svc_id}")
+
+    def wait_for_app_svc(self, cluster_id: str, retry_count=120, state="healthy"):
+        for retry_number in range(retry_count + 1):
+            app_svc = self.get_app_svc(cluster_id)
+            if app_svc and app_svc.get('currentState') == state:
+                return True
+            else:
+                if retry_number == retry_count:
+                    return False
+                logger.debug(f"Waiting for cluster {cluster_id} app service to reach state {state}")
+                time.sleep(5)
+
+    def wait_for_app_svc_delete(self, cluster_id: str, retry_count=120):
+        for retry_number in range(retry_count + 1):
+            app_svc = self.get_app_svc(cluster_id)
+            if app_svc and app_svc.get('currentState') == 'destroying':
+                if retry_number == retry_count:
+                    return False
+                logger.debug(f"Waiting for cluster {cluster_id} app service to delete")
+                time.sleep(5)
+            else:
+                return True
