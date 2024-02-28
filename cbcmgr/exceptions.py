@@ -7,6 +7,16 @@ import logging
 import json
 
 
+class NonFatalError(Exception):
+
+    def __init__(self, message):
+        frame = inspect.currentframe().f_back
+        (filename, line, function, lines, index) = inspect.getframeinfo(frame)
+        filename = os.path.basename(filename)
+        self.message = f"Error: {type(self).__name__} in {filename} {function} at line {line}: {message}"
+        super().__init__(self.message)
+
+
 class CBException(Exception):
 
     def __init__(self, message):

@@ -15,6 +15,7 @@ from requests.adapters import HTTPAdapter, Retry
 from requests.auth import AuthBase
 from aiohttp import ClientSession, TCPConnector
 from cbcmgr.retry import retry
+from cbcmgr.exceptions import NonFatalError
 from cbcmgr.cb_capella_config import CapellaConfigFile
 if os.name == 'nt':
     import certifi_win32
@@ -27,6 +28,10 @@ logger = logging.getLogger('cbcmgr.restmgr')
 logger.addHandler(logging.NullHandler())
 logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 logging.getLogger("asyncio").setLevel(logging.CRITICAL)
+
+
+class RetryableError(NonFatalError):
+    pass
 
 
 class CapellaAuth(AuthBase):
@@ -167,7 +172,10 @@ class RESTManager(object):
                     message += f" Message: {response_json['message']}"
                 if 'hint' in response_json:
                     message += f" Hint: {response_json['hint']}"
-                raise RuntimeError(message)
+                if self.response_code == 412:
+                    raise RetryableError(message)
+                else:
+                    raise RuntimeError(message)
             except json.decoder.JSONDecodeError:
                 raise RuntimeError(f"Invalid response from API endpoint: response code: {self.response_code}")
         return self
@@ -327,6 +335,7 @@ class RESTManager(object):
         self.response_dict = self.put(url, body).validate().json()
         return self
 
+    @retry(allow_list=(RetryableError,))
     def delete_capella(self, endpoint: str):
         self.response_list = []
         self.response_dict = {}
