@@ -335,7 +335,6 @@ class RESTManager(object):
         self.response_dict = self.put(url, body).validate().json()
         return self
 
-    @retry(allow_list=(RetryableError,))
     def delete_capella(self, endpoint: str):
         self.response_list = []
         self.response_dict = {}
