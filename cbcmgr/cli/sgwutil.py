@@ -447,6 +447,9 @@ class RunMain(CLI):
         if self.options.command == 'version':
             sys.exit(0)
 
+        if self.options.debug:
+            logger.setLevel(logging.DEBUG)
+
         if self.options.command == 'database':
             sgdb = SGWDatabase(hostname, username, password, ssl=ssl)
 

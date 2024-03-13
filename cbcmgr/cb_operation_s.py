@@ -152,11 +152,8 @@ class CBOperation(CBConnectLite):
         try:
             self._bucket = self.get_bucket(self._cluster, name)
         except BucketNotFoundException:
-            if self.create:
-                self.create_bucket(self._cluster, name, self.quota, self.replicas, self.max_ttl, self.flush_enabled, self.bucket_mode)
-                return self._bucket_(name)
-            else:
-                raise
+            self.create_bucket(self._cluster, name, self.quota, self.replicas, self.max_ttl, self.flush_enabled, self.bucket_mode)
+            return self._bucket_(name)
         self._bucket_name = name
         self._bucket_connected = True
         return self

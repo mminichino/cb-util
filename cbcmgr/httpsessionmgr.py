@@ -17,6 +17,10 @@ from requests.auth import AuthBase
 from .exceptions import (NotAuthorized, HTTPForbidden, HTTPNotImplemented, RequestValidationError, InternalServerError, APIError,
                          PaginationDataNotFound, SyncGatewayOperationException, PreconditionFailed, ConflictException, BadRequest)
 
+logger = logging.getLogger('cbutil.httpsessionmgr')
+logger.addHandler(logging.NullHandler())
+logging.getLogger("urllib3").setLevel(logging.CRITICAL)
+
 
 class AuthType(Enum):
     basic = 0
@@ -121,7 +125,7 @@ class APISession(object):
         warnings.filterwarnings("ignore")
         self.username = username
         self.password = password
-        self.timeout = 30
+        self.timeout = 60
         self.logger = logging.getLogger(self.__class__.__name__)
         self.url_prefix = "http://127.0.0.1"
         self.session = requests.Session()
@@ -295,7 +299,9 @@ class APISession(object):
         return self
 
     def api_put(self, endpoint, body):
-        response = self.session.put(self.url_prefix + endpoint,
+        url = self.url_prefix + endpoint
+        logger.debug(f"Put URL: {url}")
+        response = self.session.put(url,
                                     auth=self.auth_class,
                                     json=body,
                                     verify=False,
@@ -304,6 +310,7 @@ class APISession(object):
         try:
             self.check_status_code(response.status_code)
         except Exception:
+            logger.debug(f"Response body: {str(response.content)}")
             raise
 
         self._response = response.text

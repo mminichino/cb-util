@@ -256,3 +256,4 @@ class TestSyncDrv3(object):
         assert count == 10000
 
         CBOperation(hostname, "Administrator", "password", ssl=tls).connect(bucket).cleanup()
+        time.sleep(1)

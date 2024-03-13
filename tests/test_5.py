@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 
 
 @pytest.mark.serial
-class TestSGWCLI(object):
+class TestSGWCLI1(object):
     container_id = None
 
     @classmethod
@@ -29,11 +29,8 @@ class TestSGWCLI(object):
         command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
         run_in_container(cls.container_id, command)
 
-        print("Creating test buckets and loading data")
+        print("Creating test bucket and loading data")
         command = ['cbcutil', 'load', '--host', '127.0.0.1', '--count', '30', '--schema', 'employee_demo', '--replica', '0', '--safe', '--quota', '128']
-        assert run_in_container(cls.container_id, command) is True
-
-        command = ['cbcutil', 'load', '--host', '127.0.0.1', '--schema', 'insurance_sample', '--replica', '0', '--safe', '--quota', '128']
         assert run_in_container(cls.container_id, command) is True
 
     @classmethod
@@ -205,9 +202,36 @@ class TestSGWCLI(object):
         assert p.search(output) is not None
         assert result == 0
 
+
+@pytest.mark.serial
+class TestSGWCLI2(object):
+    container_id = None
+
+    @classmethod
+    def setup_class(cls):
+        print("Starting test container")
+        platform = f"linux/{os.uname().machine}"
+        cls.container_id = start_container(image_name, platform)
+
+        command = ['/bin/bash', '-c', 'test -f /demo/couchbase/.ready']
+        while not run_in_container(cls.container_id, command):
+            time.sleep(1)
+
+        command = ['cbcutil', 'list', '--host', '127.0.0.1', '--wait']
+        run_in_container(cls.container_id, command)
+
+        print("Creating test bucket and loading data")
+        command = ['cbcutil', 'load', '--host', '127.0.0.1', '--schema', 'insurance_sample', '--replica', '0', '--safe', '--quota', '128']
+        assert run_in_container(cls.container_id, command) is True
+
+    @classmethod
+    def teardown_class(cls):
+        print("Stopping test container")
+        stop_container(cls.container_id)
+
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])
-    def test_cli_15(self, hostname, bucket):
+    def test_cli_1(self, hostname, bucket):
         cmd = get_test_file('test_sgw_cli.py')
         args = ['database', 'create', '-h', hostname, '-n', 'insurance', '-b', 'insurance_sample', '-k', 'insurance_sample.data']
 
@@ -218,7 +242,7 @@ class TestSGWCLI(object):
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])
-    def test_cli_16(self, hostname, bucket):
+    def test_cli_2(self, hostname, bucket):
         cmd = get_test_file('test_sgw_cli.py')
         args = ['user', 'map', '-h', hostname, '-d', hostname, '-F', 'region', '-k', 'insurance_sample', '-n', 'insurance']
 
@@ -229,7 +253,7 @@ class TestSGWCLI(object):
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])
-    def test_cli_17(self, hostname, bucket):
+    def test_cli_3(self, hostname, bucket):
         cmd = get_test_file('test_sgw_cli.py')
         args = ['database', 'sync', '-h', hostname, '-n', 'insurance', '-f', get_test_file('insurance.js')]
 
@@ -240,7 +264,7 @@ class TestSGWCLI(object):
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])
-    def test_cli_18(self, hostname, bucket):
+    def test_cli_4(self, hostname, bucket):
         cmd = get_test_file('test_sgw_cli.py')
         args = ['auth', 'session', '-h', hostname, '-n', 'insurance', '-U', 'region@central']
 
@@ -251,7 +275,7 @@ class TestSGWCLI(object):
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])
-    def test_cli_19(self, hostname, bucket):
+    def test_cli_5(self, hostname, bucket):
         cmd = get_test_file('test_sgw_cli.py')
         args = ['database', 'delete', '-h', hostname, '-n', "insurance"]
 

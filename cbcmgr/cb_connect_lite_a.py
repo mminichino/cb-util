@@ -154,11 +154,9 @@ class CBConnectLiteAsync(CBSession):
 
     @retry()
     async def run_query(self, cluster: AsyncCluster, sql: str):
-        contents = []
         result = cluster.query(sql)
-        async for item in result:
-            contents.append(item)
-        return contents
+        results = [item async for item in result]
+        return results
 
     @retry(always_raise_list=(DocumentNotFoundException, ScopeNotFoundException, CollectionNotFoundException))
     async def get_doc(self, collection: AsyncCollection, doc_id: str):

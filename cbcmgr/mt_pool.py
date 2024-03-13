@@ -3,9 +3,6 @@
 
 import concurrent.futures
 import logging
-import os
-import itertools
-from typing import Union
 from cbcmgr.exceptions import TaskError
 from cbcmgr.cb_session import BucketMode
 from cbcmgr.cb_operation_s import CBOperation, Operation
@@ -27,17 +24,10 @@ class CBPool(object):
                  create: bool = False,
                  quota: int = 256,
                  replicas: int = 0,
-                 mode: BucketMode = BucketMode.DEFAULT,
-                 connections: Union[None, int] = None):
+                 mode: BucketMode = BucketMode.DEFAULT):
         self.keyspace = {}
         self.tasks = set()
-        if connections:
-            self.connections = connections
-        else:
-            self.connections = os.cpu_count()
-        self.index_cycle = itertools.cycle(range(self.connections))
-        self.max_threads = max(self.connections * 4, os.cpu_count() * 4)
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_threads)
+        self.executor = concurrent.futures.ThreadPoolExecutor()
         self.hostname = hostname
         self.username = username
         self.password = password
@@ -53,23 +43,20 @@ class CBPool(object):
     def connect(self, keyspace):
         if keyspace in self.keyspace:
             return
-        logger.debug(f"pool add: {self.hostname} {keyspace} create is {self.create}")
-        self.keyspace[keyspace] = [None] * self.connections
-        for num in range(self.connections):
-            self.keyspace[keyspace][num] = CBOperation(self.hostname,
-                                                       self.username,
-                                                       self.password,
-                                                       ssl=self.ssl,
-                                                       kv_timeout=self.kv_timeout,
-                                                       query_timeout=self.query_timeout,
-                                                       quota=self.quota,
-                                                       replicas=self.replicas,
-                                                       mode=self.mode,
-                                                       create=self.create).connect(keyspace)
+        logger.debug(f"pool add: cluster {self.hostname} keyspace {keyspace}")
+        self.keyspace[keyspace] = CBOperation(self.hostname,
+                                              self.username,
+                                              self.password,
+                                              ssl=self.ssl,
+                                              kv_timeout=self.kv_timeout,
+                                              query_timeout=self.query_timeout,
+                                              quota=self.quota,
+                                              replicas=self.replicas,
+                                              mode=self.mode,
+                                              create=self.create).connect(keyspace)
 
     def dispatch(self, keyspace: str, op: Operation, *args):
-        index = next(self.index_cycle)
-        opm = self.keyspace[keyspace][index]
+        opm = self.keyspace[keyspace]
         operator = opm.get_operator(op)
         operator.prep(*args)
         self.tasks.add(self.executor.submit(operator.execute))
@@ -82,3 +69,6 @@ class CBPool(object):
                     task.result()
                 except Exception as err:
                     raise TaskError(err)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.executor.shutdown()
