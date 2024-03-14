@@ -28,7 +28,7 @@ setup(
         "pytest>=7.0.1",
         "pytest-asyncio>=0.16.0",
         "requests>=2.31.0",
-        "urllib3==1.26.16",
+        "urllib3>=2.2.1",
         "xmltodict>=0.13.0",
         "bumpversion>=0.6.0",
         "overrides>=7.4.0",
