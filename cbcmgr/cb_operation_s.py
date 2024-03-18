@@ -198,6 +198,9 @@ class CBOperation(CBConnectLite):
         except (BucketNotFoundException, BucketDoesNotExistException):
             pass
 
+    def vector_search(self, index: str, field: str, vector: List[float]):
+        return self._vector_search(self._scope, self._collection, index, field, vector)
+
     def get_count(self) -> int:
         return self.collection_count(self._cluster, self.get_keyspace)
 

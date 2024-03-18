@@ -12,15 +12,17 @@ import logging
 import hashlib
 from datetime import timedelta
 from typing import Union, Dict, Any, List
+import couchbase.search as search
 from couchbase.cluster import Cluster
 from couchbase.bucket import Bucket
 from couchbase.scope import Scope
 from couchbase.collection import Collection
-from couchbase.options import QueryOptions
+from couchbase.options import QueryOptions, SearchOptions
 from couchbase.management.users import Role, User, Group
 from couchbase.management.buckets import CreateBucketSettings, BucketType, EvictionPolicyType, CompressionMode, ConflictResolutionType
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions
+from couchbase.vector_search import VectorQuery, VectorSearch
 from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException, BucketAlreadyExistsException, ScopeAlreadyExistsException,
                                   CollectionAlreadyExistsException, QueryIndexAlreadyExistsException, DocumentNotFoundException, WatchQueryIndexTimeoutException)
 
@@ -280,6 +282,13 @@ class CBConnectLite(CBSession):
     def put_doc(self, collection: Collection, doc_id: str, document: JSONType):
         result = collection.upsert(doc_id, document)
         return result.cas
+
+    def _vector_search(self, scope: Scope, collection: Collection, index: str, field: str, vector: List[float]):
+        search_req = search.SearchRequest.create(search.MatchAllQuery()).with_vector_search(
+            VectorSearch.from_vector_query(VectorQuery(field, vector)))
+        search_iter = scope.search(index, search_req, SearchOptions(limit=2))
+        results = [self.get_doc(collection, item.id) for item in search_iter.rows()]
+        return results
 
     def index_by_query(self, sql: str):
         advisor = f"select advisor([\"{sql}\"])"

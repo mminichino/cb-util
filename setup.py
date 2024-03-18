@@ -22,7 +22,7 @@ setup(
     package_data={'cbcmgr': ['data/*']},
     install_requires=[
         "attrs>=22.2.0",
-        "couchbase==4.1.11",
+        "couchbase>=4.2.0",
         "dnspython>=2.3.0",
         "docker>=5.0.3",
         "pytest>=7.0.1",
