@@ -201,6 +201,17 @@ class CBOperation(CBConnectLite):
     def vector_search(self, index: str, field: str, vector: List[float]):
         return self._vector_search(self._scope, self._collection, index, field, vector)
 
+    def vector_index(self, name: str, dims=1536, vector_field="vector_field", similarity="l2_norm", text_field=None):
+        self._vector_index(self._scope,
+                           self._bucket_name,
+                           self._scope_name,
+                           self._collection_name,
+                           name,
+                           dims,
+                           vector_field,
+                           similarity,
+                           text_field)
+
     def get_count(self) -> int:
         return self.collection_count(self._cluster, self.get_keyspace)
 

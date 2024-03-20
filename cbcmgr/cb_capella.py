@@ -203,16 +203,31 @@ class Support:
 
 
 @attr.s
+class CouchbaseServer:
+    version: Optional[str] = attr.ib(default=None)
+
+
+@attr.s
 class CapellaCluster:
     name: Optional[str] = attr.ib(default=None)
     description: Optional[str] = attr.ib(default=None)
     cloudProvider: Optional[CloudProvider] = attr.ib(default=None)
+    couchbaseServer: Optional[CouchbaseServer] = attr.ib(default=None)
     serviceGroups: Optional[List[ServiceGroup]] = attr.ib(default=[])
     availability: Optional[Availability] = attr.ib(default=None)
     support: Optional[Support] = attr.ib(default=None)
 
     @classmethod
-    def create(cls, name, description, cloud, region, cidr='10.0.0.0/23', availability=NodeAvailability.multi, plan=SupportPlan.devpro, timezone=SupportTZ.western_us):
+    def create(cls,
+               name,
+               description,
+               cloud,
+               region,
+               cidr='10.0.0.0/23',
+               availability=NodeAvailability.multi,
+               plan=SupportPlan.devpro,
+               timezone=SupportTZ.western_us,
+               version="latest"):
         return cls(
             name,
             description,
@@ -221,6 +236,7 @@ class CapellaCluster:
                 region,
                 cidr
             ),
+            CouchbaseServer(version),
             [],
             Availability(availability),
             Support(plan, timezone)
@@ -558,6 +574,10 @@ class Capella(object):
         cidr_util.get_next_network()
         subnet_list = list(cidr_util.get_next_subnet(prefix=23))
         subnet_cycle = cycle(subnet_list)
+
+        if parameters.get("couchbaseServer", {}).get("version") in (None, "latest"):
+            if parameters.get("couchbaseServer"):
+                del parameters["couchbaseServer"]
 
         response = self.get_cluster(cluster.name)
         if response:

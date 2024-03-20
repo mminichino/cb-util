@@ -1,5 +1,6 @@
 ##
 ##
+import attrs
 
 from .exceptions import (IndexInternalError, CollectionGetError, CollectionCountError, BucketCreateException)
 from .retry import retry
@@ -8,6 +9,7 @@ from .cb_bucket import Bucket as CouchbaseBucket
 from .cb_index import CBQueryIndex
 from .cb_capella import Capella, Credentials
 from .httpsessionmgr import APISession
+from .cb_search_index import CBSearchIndex
 import logging
 import hashlib
 from datetime import timedelta
@@ -18,6 +20,7 @@ from couchbase.bucket import Bucket
 from couchbase.scope import Scope
 from couchbase.collection import Collection
 from couchbase.options import QueryOptions, SearchOptions
+from couchbase.management.search import SearchIndex
 from couchbase.management.users import Role, User, Group
 from couchbase.management.buckets import CreateBucketSettings, BucketType, EvictionPolicyType, CompressionMode, ConflictResolutionType
 from couchbase.management.collections import CollectionSpec
@@ -289,6 +292,27 @@ class CBConnectLite(CBSession):
         search_iter = scope.search(index, search_req, SearchOptions(limit=2))
         results = [self.get_doc(collection, item.id) for item in search_iter.rows()]
         return results
+
+    @staticmethod
+    def _vector_index(scope: Scope,
+                      bucket_name: str,
+                      scope_name: str,
+                      collection_name: str,
+                      name: str,
+                      dims=1536,
+                      vector_field="vector_field",
+                      similarity="l2_norm",
+                      text_field=None):
+        sixm = scope.search_indexes()
+        search_index = CBSearchIndex().create(f"{scope_name}.{collection_name}", dims, vector_field, similarity, text_field)
+        parameters = attrs.asdict(search_index)
+
+        idx = SearchIndex(name=name,
+                          idx_type='fulltext-index',
+                          source_name=bucket_name,
+                          source_type='gocbcore',
+                          params=parameters)
+        sixm.upsert_index(idx)
 
     def index_by_query(self, sql: str):
         advisor = f"select advisor([\"{sql}\"])"
