@@ -38,11 +38,16 @@ test_capella:
 test_rest:
 		python -m pytest tests/test_7.py
 test:
-		python -m pytest \
-		tests/test_1.py \
-		tests/test_2.py \
-		tests/test_3.py \
-		tests/test_4.py \
-		tests/test_5.py \
-		tests/test_6.py \
-		tests/test_7.py
+		python -m pytest tests/test_1.py::TestSyncDrv1::test_1 && \
+		python -m pytest tests/test_1.py::TestSyncDrv1::test_2 && \
+		python -m pytest tests/test_1.py::TestSyncDrv2::test_1 && \
+		python -m pytest tests/test_1.py::TestSyncDrv2::test_2 && \
+		python -m pytest tests/test_1.py::TestSyncDrv3::test_1 && \
+		python -m pytest tests/test_2.py::TestAsyncDrv1::test_1 && \
+		python -m pytest tests/test_2.py::TestAsyncDrv1::test_2 && \
+		python -m pytest tests/test_2.py::TestAsyncDrv2::test_1 && \
+		python -m pytest tests/test_3.py && \
+		python -m pytest tests/test_4.py && \
+		python -m pytest tests/test_5.py && \
+		python -m pytest tests/test_6.py && \
+		python -m pytest tests/test_7.py

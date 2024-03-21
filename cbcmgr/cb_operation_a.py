@@ -120,6 +120,9 @@ class CBOperationAsync(CBConnectLiteAsync):
         await self._collection_(collection)
         return self
 
+    async def close(self):
+        await self._cluster.close()
+
     async def reconnect(self):
         logger.debug("reconnecting to cluster")
         await self._cluster.close()

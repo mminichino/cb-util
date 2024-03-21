@@ -15,11 +15,12 @@ import hashlib
 from datetime import timedelta
 from typing import Union, Dict, Any, List
 import couchbase.search as search
+from couchbase.diagnostics import ServiceType
 from couchbase.cluster import Cluster
 from couchbase.bucket import Bucket
 from couchbase.scope import Scope
 from couchbase.collection import Collection
-from couchbase.options import QueryOptions, SearchOptions
+from couchbase.options import QueryOptions, SearchOptions, WaitUntilReadyOptions
 from couchbase.management.search import SearchIndex
 from couchbase.management.users import Role, User, Group
 from couchbase.management.buckets import CreateBucketSettings, BucketType, EvictionPolicyType, CompressionMode, ConflictResolutionType
@@ -115,6 +116,8 @@ class CBConnectLite(CBSession):
             except BucketAlreadyExistsException:
                 pass
 
+        self._cluster.wait_until_ready(timedelta(seconds=10), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
+
     @retry(always_raise_list=(ScopeNotFoundException,))
     def get_scope(self, bucket: Bucket, name: str = "_default") -> Scope:
         if name is None:
@@ -135,6 +138,8 @@ class CBConnectLite(CBSession):
                 cm.create_scope(name)
         except ScopeAlreadyExistsException:
             pass
+
+        self._cluster.wait_until_ready(timedelta(seconds=10), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
 
     @retry(always_raise_list=(CollectionNotFoundException,))
     def get_collection(self, bucket: Bucket, scope: Scope, name: str = "_default") -> Collection:
@@ -165,6 +170,8 @@ class CBConnectLite(CBSession):
                 self.collection_wait(bucket, scope, name)
         except CollectionAlreadyExistsException:
             pass
+
+        self._cluster.wait_until_ready(timedelta(seconds=10), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
 
     @staticmethod
     def try_collection(bucket: Bucket, name: str):
@@ -314,6 +321,7 @@ class CBConnectLite(CBSession):
                           params=parameters)
         sixm.upsert_index(idx)
 
+    @retry()
     def index_by_query(self, sql: str):
         advisor = f"select advisor([\"{sql}\"])"
         cluster: Cluster = self.session()
@@ -325,15 +333,18 @@ class CBConnectLite(CBSession):
             logger.debug("index already exists")
             return
 
-        try:
-            index_list = results[0]['$1']['recommended_indexes']
-            for item in index_list:
-                index_query = item['index']
-                logger.debug(f"creating index: {index_query}")
-                self.run_query(cluster, index_query)
-        except (KeyError, ValueError):
+        result_set = results[0].get('$1', {})
+        if 'recommended_indexes' in result_set:
+            index_list = result_set['recommended_indexes']
+        elif 'recommended_covering_indexes' in result_set:
+            index_list = result_set['recommended_covering_indexes']
+        else:
             logger.debug(f"can not get recommended index from query {advisor}")
             raise IndexInternalError(f"can not determine index for query")
+        for item in index_list:
+            index_query = item['index']
+            logger.debug(f"creating index: {index_query}")
+            self.run_query(cluster, index_query)
 
     @retry()
     def index_create(self, index: CBQueryIndex, timeout: int = 480, deferred: bool = True):

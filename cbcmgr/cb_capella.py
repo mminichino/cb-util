@@ -594,12 +594,12 @@ class Capella(object):
                 if match:
                     logger.debug(f"Provided CIDR {cluster.cloudProvider.cidr} is in use in the organization")
                     network_cidr = next(subnet_cycle)
-                    cluster.cloudProvider.cidr = network_cidr
-                    # noinspection PyTypeChecker
-                    parameters = attrs.asdict(cluster)
+                    parameters['cloudProvider']['cidr'] = network_cidr
                     logger.debug(f"Trying new CIDR {network_cidr}")
                 else:
                     raise CapellaError(f"Can not create Capella database: {err}")
+            except Exception as err:
+                raise CapellaError(f"Unknown Error: {err}")
 
     def update_cluster(self, updates: CapellaClusterUpdate):
         cluster = self.get_cluster(updates.name)

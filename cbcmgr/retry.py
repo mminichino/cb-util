@@ -4,8 +4,11 @@
 import time
 import asyncio
 import logging
+import traceback
 from typing import Callable
 from functools import wraps
+from couchbase.exceptions import CouchbaseException
+from cbcmgr.exceptions import CBException, APIException
 
 logger = logging.getLogger('cbutil.retry')
 logger.addHandler(logging.NullHandler())
@@ -38,7 +41,7 @@ def retry(retry_count=10,
                 for retry_number in range(retry_count + 1):
                     try:
                         return func(*args, **kwargs)
-                    except Exception as err:
+                    except (CouchbaseException, CBException, APIException) as err:
                         if always_raise_list and isinstance(err, always_raise_list):
                             raise
 
@@ -47,6 +50,8 @@ def retry(retry_count=10,
 
                         if retry_number == retry_count:
                             logger.debug(f"{func.__name__} retry limit exceeded")
+                            logger.debug(f"Error: {err}")
+                            logger.debug(traceback.format_exc())
                             raise
 
                         logger.debug(f"{func.__name__} will retry, number {retry_number + 1}")
@@ -61,7 +66,7 @@ def retry(retry_count=10,
                 for retry_number in range(retry_count + 1):
                     try:
                         return await func(*args, **kwargs)
-                    except Exception as err:
+                    except (CouchbaseException, CBException, APIException) as err:
                         if always_raise_list and isinstance(err, always_raise_list):
                             raise
 
@@ -70,6 +75,8 @@ def retry(retry_count=10,
 
                         if retry_number == retry_count:
                             logger.debug(f"{func.__name__} retry limit exceeded")
+                            logger.debug(f"Error: {err}")
+                            logger.debug(traceback.format_exc())
                             raise
 
                         logger.debug(f"{func.__name__} will retry, number {retry_number + 1}")

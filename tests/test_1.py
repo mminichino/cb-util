@@ -104,6 +104,7 @@ class TestSyncDrv1(object):
         dbm.delete_wait()
         dbm.delete_wait(index_name)
         dbm.drop_bucket(bucket)
+        dbm.close()
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket", ["test"])
@@ -148,6 +149,7 @@ class TestSyncDrv1(object):
         assert a_query.result[0]['data'] == 'data'
 
         col_a.cleanup()
+        col_a.close()
 
 
 @pytest.mark.serial
@@ -247,6 +249,7 @@ class TestSyncDrv3(object):
                 pool.dispatch(keyspace, Operation.WRITE, f"test::{i+1}", document)
 
         pool.join()
+        pool.shutdown()
         time.sleep(1)
         count = 0
         for n in range(10):

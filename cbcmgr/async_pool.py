@@ -87,3 +87,7 @@ class CBPoolAsync(object):
             for result in results:
                 if isinstance(result, Exception):
                     raise TaskError(f"task error: {result}")
+
+    async def shutdown(self):
+        for opm in self.keyspace.values():
+            await opm.close()

@@ -70,5 +70,7 @@ class CBPool(object):
                 except Exception as err:
                     raise TaskError(err)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def shutdown(self):
         self.executor.shutdown()
+        for opm in self.keyspace.values():
+            opm.close()

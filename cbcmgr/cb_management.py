@@ -56,9 +56,10 @@ class CBManager(CBConnect):
         self._cluster = self.session()
         return self
 
-    def create_bucket(self, bucket: Bucket):
-        self._cluster.wait_until_ready(timedelta(seconds=5), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
+    def close(self):
+        self._cluster.close()
 
+    def create_bucket(self, bucket: Bucket):
         result = self.get_bucket(bucket.name)
         if result:
             logger.debug(f"create_bucket: bucket {bucket.name} already exists")
@@ -94,6 +95,7 @@ class CBManager(CBConnect):
                 except BucketAlreadyExistsException:
                     pass
 
+        self._cluster.wait_until_ready(timedelta(seconds=10), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
         self.bucket(bucket.name)
 
     def drop_bucket(self, name):
@@ -127,6 +129,7 @@ class CBManager(CBConnect):
                 cm.create_scope(name, CreateScopeOptions(timeout=timedelta(seconds=25)))
         except ScopeAlreadyExistsException:
             pass
+        self._cluster.wait_until_ready(timedelta(seconds=10), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
         self.scope(name)
 
     def create_collection(self, name, max_ttl=0):
@@ -142,6 +145,7 @@ class CBManager(CBConnect):
                 retry_inline(self.get_collection, cm, name)
         except CollectionAlreadyExistsException:
             pass
+        self._cluster.wait_until_ready(timedelta(seconds=10), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
         self.collection(name)
 
     def get_bucket(self, name: str) -> Optional[BucketSettings]:

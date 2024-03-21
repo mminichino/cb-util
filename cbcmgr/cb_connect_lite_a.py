@@ -168,6 +168,7 @@ class CBConnectLiteAsync(CBSession):
         result = await collection.upsert(doc_id, document)
         return result.cas
 
+    @retry()
     async def index_by_query(self, sql: str):
         advisor = f"select advisor([\"{sql}\"])"
         cluster: AsyncCluster = await self.session_a()
@@ -179,15 +180,18 @@ class CBConnectLiteAsync(CBSession):
             logger.debug("index already exists")
             return
 
-        try:
-            index_list = results[0]['$1']['recommended_indexes']
-            for item in index_list:
-                index_query = item['index']
-                logger.debug(f"creating index: {index_query}")
-                await self.run_query(cluster, index_query)
-        except (KeyError, ValueError):
+        result_set = results[0].get('$1', {})
+        if 'recommended_indexes' in result_set:
+            index_list = result_set['recommended_indexes']
+        elif 'recommended_covering_indexes' in result_set:
+            index_list = result_set['recommended_covering_indexes']
+        else:
             logger.debug(f"can not get recommended index from query {advisor}")
             raise IndexInternalError(f"can not determine index for query")
+        for item in index_list:
+            index_query = item['index']
+            logger.debug(f"creating index: {index_query}")
+            await self.run_query(cluster, index_query)
 
     @retry()
     async def create_indexes(self, cluster: AsyncCluster, bucket: AsyncBucket, scope: AsyncScope, collection: AsyncCollection, fields: List[str], replica: int = 0):

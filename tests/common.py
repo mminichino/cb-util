@@ -19,7 +19,7 @@ parent = os.path.dirname(current)
 logging.getLogger("docker").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-image_name = "mminichino/cbdev:latest"
+image_name = "mminichino/cbdev:4.0.2"
 document = {
     "id": 1,
     "data": "data",

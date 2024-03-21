@@ -133,6 +133,9 @@ class CBOperation(CBConnectLite):
         logger.debug(f"connecting to {keyspace}")
         return self._bucket_(bucket)._scope_(scope)._collection_(collection)
 
+    def close(self):
+        self._cluster.close()
+
     def reconnect(self):
         logger.debug("reconnecting to cluster")
         self._cluster.close()

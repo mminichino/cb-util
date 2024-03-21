@@ -72,10 +72,10 @@ class CBSession(object):
         self.auth = PasswordAuthenticator(self.username, self.password)
         self.timeouts = ClusterTimeoutOptions(query_timeout=timedelta(seconds=query_timeout),
                                               kv_timeout=timedelta(seconds=kv_timeout),
-                                              bootstrap_timeout=timedelta(seconds=kv_timeout),
+                                              bootstrap_timeout=timedelta(seconds=kv_timeout * 2),
                                               resolve_timeout=timedelta(seconds=kv_timeout),
                                               connect_timeout=timedelta(seconds=kv_timeout),
-                                              management_timeout=timedelta(seconds=kv_timeout))
+                                              management_timeout=timedelta(seconds=kv_timeout * 2))
 
         if self.ssl:
             self.prefix = "https://"
@@ -112,6 +112,14 @@ class CBSession(object):
         cluster = await AsyncCluster.connect(self.cb_connect_string, self.cluster_options)
         await cluster.on_connect()
         return cluster
+
+    @staticmethod
+    def end_session(cluster: Cluster) -> None:
+        cluster.close()
+
+    @staticmethod
+    async def end_session_a(cluster: AsyncCluster) -> None:
+        await cluster.close()
 
     def construct_key(self, key):
         if type(key) is int or str(key).isdigit():

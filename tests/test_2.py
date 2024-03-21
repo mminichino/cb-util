@@ -66,6 +66,7 @@ class TestAsyncDrv1(object):
         result = await ca.get_doc(collection, "test::1")
         assert result == document
 
+        time.sleep(1)
         result = await ca.collection_count(cluster, keyspace)
         assert result == 1
 
@@ -74,6 +75,7 @@ class TestAsyncDrv1(object):
 
         bm = cluster.buckets()
         await bm.drop_bucket(bucket_name)
+        await ca.end_session_a(cluster)
 
     @pytest.mark.parametrize("hostname", ["127.0.0.1"])
     @pytest.mark.parametrize("bucket_name", ["test"])
@@ -124,6 +126,7 @@ class TestAsyncDrv1(object):
         assert a_query.result[0]['data'] == 'data'
 
         await col_a.cleanup()
+        await col_a.close()
 
 
 @pytest.mark.serial
@@ -166,6 +169,7 @@ class TestAsyncDrv2(object):
                 await pool.dispatch(keyspace, Operation.WRITE, f"test::{i + 1}", document)
 
         await pool.join()
+        await pool.shutdown()
         await asyncio.sleep(1)
         count = 0
         for n in range(10):

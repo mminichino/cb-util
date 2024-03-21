@@ -5,11 +5,13 @@ import warnings
 import pytest
 import time
 import os
+import logging
 from tests import get_test_file
 from tests.common import start_container, stop_container, run_in_container, cli_run, image_name
 
 
 warnings.filterwarnings("ignore")
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.serial
@@ -46,6 +48,7 @@ class TestSGWCLI1(object):
 
         result, output = cli_run(cmd, *args)
         p = re.compile(f"Database testdb does not exist.")
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         assert p.search(output) is not None
         assert result == 1
 
@@ -57,6 +60,7 @@ class TestSGWCLI1(object):
 
         result, output = cli_run(cmd, *args)
         p = re.compile(f"Database testdb created for bucket employees")
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         assert p.search(output) is not None
         assert result == 0
 
@@ -67,6 +71,7 @@ class TestSGWCLI1(object):
         args = ['database', 'list', '-h', hostname, '-n', "testdb"]
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f"Bucket:.*employees")
         assert p.search(output) is not None
         p = re.compile(f"Name:.*testdb")
@@ -83,6 +88,7 @@ class TestSGWCLI1(object):
 
         result, output = cli_run(cmd, *args)
         p = re.compile(r"Key: .* Id: .* Channels: .*")
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         assert p.findall(output) is not None
         assert result == 0
 
@@ -94,6 +100,7 @@ class TestSGWCLI1(object):
 
         result, output = cli_run(cmd, *args)
         p = re.compile(r"User demouser does not exist")
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         assert p.search(output) is not None
         assert result == 1
 
@@ -105,6 +112,7 @@ class TestSGWCLI1(object):
 
         result, output = cli_run(cmd, *args)
         p = re.compile(f"User demouser created for database testdb")
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         assert p.search(output) is not None
         assert result == 0
 
@@ -116,6 +124,7 @@ class TestSGWCLI1(object):
 
         result, output = cli_run(cmd, *args)
         p = re.compile(f"demouser.*")
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         assert p.search(output) is not None
         assert result == 0
 
@@ -126,6 +135,7 @@ class TestSGWCLI1(object):
         args = ['user', 'list', '-h', hostname, '-n', "testdb", '--sguser', "demouser"]
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f"Name:.*demouser")
         assert p.search(output) is not None
         p = re.compile(f"Admin channels")
@@ -143,6 +153,7 @@ class TestSGWCLI1(object):
         args = ['user', 'map', '-h', hostname, '-d', hostname, '-F', 'store_id', '-k', 'employees', '-n', 'testdb']
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(r"User store_id@1 created for database testdb")
         assert p.findall(output) is not None
         assert result == 0
@@ -154,6 +165,7 @@ class TestSGWCLI1(object):
         args = ['user', 'list', '-h', hostname, '-n', "testdb", '--sguser', "store_id@1"]
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(r"Name:.*store_id@1")
         assert p.search(output) is not None
         assert result == 0
@@ -165,6 +177,7 @@ class TestSGWCLI1(object):
         args = ['database', 'sync', '-h', hostname, '-n', 'testdb', '-f', get_test_file('employee.js')]
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f"Sync function created for database testdb")
         assert p.findall(output) is not None
         assert result == 0
@@ -176,6 +189,7 @@ class TestSGWCLI1(object):
         args = ['database', 'sync', '-h', hostname, '-n', 'testdb', '-g']
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(r"function sync.*")
         assert p.findall(output) is not None
         assert result == 0
@@ -187,6 +201,7 @@ class TestSGWCLI1(object):
         args = ['user', 'delete', '-h', hostname, '-n', "testdb", '--sguser', "demouser"]
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f"User demouser deleted from testdb")
         assert p.search(output) is not None
         assert result == 0
@@ -198,6 +213,7 @@ class TestSGWCLI1(object):
         args = ['database', 'delete', '-h', hostname, '-n', "testdb"]
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f"Database testdb deleted")
         assert p.search(output) is not None
         assert result == 0
@@ -236,6 +252,7 @@ class TestSGWCLI2(object):
         args = ['database', 'create', '-h', hostname, '-n', 'insurance', '-b', 'insurance_sample', '-k', 'insurance_sample.data']
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f"Database insurance created")
         assert p.search(output) is not None
         assert result == 0
@@ -247,6 +264,7 @@ class TestSGWCLI2(object):
         args = ['user', 'map', '-h', hostname, '-d', hostname, '-F', 'region', '-k', 'insurance_sample', '-n', 'insurance']
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(r"User region@global created for database insurance")
         assert p.findall(output) is not None
         assert result == 0
@@ -258,6 +276,7 @@ class TestSGWCLI2(object):
         args = ['database', 'sync', '-h', hostname, '-n', 'insurance', '-f', get_test_file('insurance.js')]
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f"Sync function created for database insurance.data.adjuster")
         assert p.findall(output) is not None
         assert result == 0
@@ -269,6 +288,7 @@ class TestSGWCLI2(object):
         args = ['auth', 'session', '-h', hostname, '-n', 'insurance', '-U', 'region@central']
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f".*cookie_name.*SyncGatewaySession")
         assert p.findall(output) is not None
         assert result == 0
@@ -280,6 +300,7 @@ class TestSGWCLI2(object):
         args = ['database', 'delete', '-h', hostname, '-n', "insurance"]
 
         result, output = cli_run(cmd, *args)
+        logger.debug(f"{cmd} {' '.join(args)}: {output}")
         p = re.compile(f"Database insurance deleted")
         assert p.search(output) is not None
         assert result == 0
