@@ -2,7 +2,7 @@ import os
 from pkg_resources import parse_version
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))
-__version__ = "2.2.17"
+__version__ = "2.2.18"
 VERSION = parse_version(__version__)
 
 
