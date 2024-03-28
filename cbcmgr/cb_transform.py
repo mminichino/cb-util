@@ -48,7 +48,8 @@ class CBTransform(CBOperation):
         now_time = time.perf_counter()
         self._run_count += 1
         run_duration = now_time - self.start_time
-        self._ops_per_sec = self._run_count / run_duration
+        if run_duration > 0:
+            self._ops_per_sec = self._run_count / run_duration
 
     def join(self):
         while self.tasks:
