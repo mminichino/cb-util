@@ -20,7 +20,8 @@ class TestCapella(object):
         logger.setLevel(logging.DEBUG)
 
     def test_1(self):
-        project = Capella().get_project('pytest-project')
+        profile = "pytest"
+        project = Capella(profile=profile).get_project('pytest-project')
         project_id = project.get('id')
 
         assert project_id is not None
@@ -29,26 +30,26 @@ class TestCapella(object):
         cluster.add_service_group("aws", "4x16")
 
         print("Creating cluster")
-        cluster_id = Capella(project_id=project_id).create_cluster(cluster)
+        cluster_id = Capella(project_id=project_id, profile=profile).create_cluster(cluster)
 
         assert cluster_id is not None
 
         print("Waiting for cluster creation to complete")
-        result = Capella(project_id=project_id).wait_for_cluster("pytest-cluster")
+        result = Capella(project_id=project_id, profile=profile).wait_for_cluster("pytest-cluster")
 
         assert result is True
 
         cidr = AllowedCIDR().create()
 
         print("Creating allowed CIDR")
-        cidr_id = Capella(project_id=project_id).allow_cidr(cluster_id, cidr)
+        cidr_id = Capella(project_id=project_id, profile=profile).allow_cidr(cluster_id, cidr)
 
         assert cidr_id is not None
 
         credentials = Credentials().create("sysdba", "Passw0rd!")
 
         print("Creating database credentials")
-        account_id = Capella(project_id=project_id).add_db_user(cluster_id, credentials)
+        account_id = Capella(project_id=project_id, profile=profile).add_db_user(cluster_id, credentials)
 
         assert account_id is not None
 
@@ -58,17 +59,17 @@ class TestCapella(object):
         ))
 
         print("Creating bucket")
-        bucket_id = Capella(project_id=project_id).add_bucket(cluster_id, bucket)
+        bucket_id = Capella(project_id=project_id, profile=profile).add_bucket(cluster_id, bucket)
 
         assert bucket_id is not None
         time.sleep(1)
 
         print("Deleting bucket")
-        Capella(project_id=project_id).delete_bucket("pytest-cluster", "employees")
+        Capella(project_id=project_id, profile=profile).delete_bucket("pytest-cluster", "employees")
 
         print("Deleting cluster")
-        Capella(project_id=project_id).delete_cluster("pytest-cluster")
+        Capella(project_id=project_id, profile=profile).delete_cluster("pytest-cluster")
         print("Waiting for cluster deletion to complete")
-        result = Capella(project_id=project_id).wait_for_cluster_delete("pytest-cluster")
+        result = Capella(project_id=project_id, profile=profile).wait_for_cluster_delete("pytest-cluster")
 
         assert result is True
