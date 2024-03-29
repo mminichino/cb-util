@@ -33,7 +33,7 @@ class CBTransform(CBOperation):
         self.start_time = time.perf_counter()
         self._error_count = multiprocessing.Value('i', 0)
         self._run_count: int = 0
-        self._ops_per_sec: float = 0.0
+        self._ops_per_sec: float = 1.0
 
     def process(self, source: dict, transform: Type[Transform]):
         try:
@@ -69,6 +69,15 @@ class CBTransform(CBOperation):
     @property
     def error_count(self) -> int:
         return self._error_count.value
+
+    @property
+    def run_count(self) -> int:
+        return self._run_count
+
+    @property
+    def run_time(self) -> float:
+        now_time = time.perf_counter()
+        return now_time - self.start_time
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.executor.shutdown()
