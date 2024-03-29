@@ -5,6 +5,7 @@ import concurrent.futures
 import logging
 import json
 import time
+import multiprocessing
 from typing import Type, Tuple
 from cbcmgr.exceptions import TaskError
 from cbcmgr.cb_operation_s import CBOperation
@@ -30,7 +31,7 @@ class CBTransform(CBOperation):
         self.executor = concurrent.futures.ThreadPoolExecutor()
         self.connect(keyspace)
         self.start_time = time.perf_counter()
-        self._error_count: int = 0
+        self._error_count = multiprocessing.Value('i', 0)
         self._run_count: int = 0
         self._ops_per_sec: float = 0.0
 
@@ -39,7 +40,8 @@ class CBTransform(CBOperation):
             key, document = transform().transform(source)
             self.put_doc(self.collection, key, document)
         except Exception as e:
-            self._error_count += 1
+            with self._error_count.get_lock():
+                self._error_count.value += 1
             logger.error(f"Transform failed: {e}")
             logger.error(f"Source:\n{json.dumps(source, indent=2)}")
 
@@ -66,7 +68,7 @@ class CBTransform(CBOperation):
 
     @property
     def error_count(self) -> int:
-        return self._error_count
+        return self._error_count.value
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.executor.shutdown()
