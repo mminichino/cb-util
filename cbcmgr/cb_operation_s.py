@@ -191,6 +191,9 @@ class CBOperation(CBConnectLite):
         self._collection_connected = True
         return self
 
+    def wait_for_collection(self, name: str = "_default"):
+        self.collection_wait(self._bucket, self._scope, name)
+
     def cleanup(self):
         if not self._cluster or not self._cluster.connected:
             return
