@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 import attr
-from typing import List, Optional, Union
-
-import attrs
+from typing import List, Optional
 
 
 @attr.s
@@ -14,16 +12,23 @@ class CBSearchIndex:
     mapping: Optional[MappingScoped] = attr.ib(default=None)
 
     @classmethod
-    def create(cls, name: str, dims=1536, vector_field=None, similarity="l2_norm", text_field=None):
-        mapping = MappingScoped()
-        map_types = MappingTypes().create()
-        if vector_field:
-            map_types.add_vector(dims, vector_field, similarity)
-        if text_field:
-            map_types.add_text(text_field)
-        mapping.types = MappingType(map_types).as_name(name)
+    def create(cls, name: str, dims=1536, vector_field=None, similarity="l2_norm", text_field=None, default=False):
+        if default:
+            mapping = MappingDefault()
+            if vector_field:
+                mapping.default_mapping.add_vector(dims, vector_field, similarity)
+            if text_field:
+                mapping.default_mapping.add_text(text_field)
+        else:
+            mapping = MappingScoped()
+            map_types = MappingTypes().create()
+            if vector_field:
+                map_types.add_vector(dims, vector_field, similarity)
+            if text_field:
+                map_types.add_text(text_field)
+            mapping.types = MappingType(map_types).as_name(name)
         return cls(
-            DocConfig(),
+            DocConfig.create(default),
             mapping,
         )
 
@@ -44,6 +49,19 @@ class DocConfig:
     docid_regexp: Optional[str] = attr.ib(default="")
     mode: Optional[str] = attr.ib(default="scope.collection.type_field")
     type_field: Optional[str] = attr.ib(default="type")
+
+    @classmethod
+    def create(cls, default=False):
+        if default:
+            mode = "type_field"
+        else:
+            mode = "scope.collection.type_field"
+        return cls(
+            "",
+            "",
+            mode,
+            "type"
+        )
 
     @classmethod
     def from_dict(cls, json_data: dict):
@@ -162,13 +180,12 @@ class MappingDefault:
     default_analyzer: Optional[str] = attr.ib(default="standard")
     default_datetime_parser: Optional[str] = attr.ib(default="dateTimeOptional")
     default_field: [str] = attr.ib(default="_all")
-    default_mapping: Optional[Union[DefaultMappingScoped, DefaultMappingDefault]] = attr.ib(default=DefaultMappingScoped(True, False))
+    default_mapping: Optional[DefaultMappingDefault] = attr.ib(default=DefaultMappingDefault.create())
     default_type: Optional[str] = attr.ib(default="_default")
     docvalues_dynamic: Optional[bool] = attr.ib(default=False)
     index_dynamic: Optional[bool] = attr.ib(default=True)
-    store_dynamic: Optional[bool] = attr.ib(default=False)
+    store_dynamic: Optional[bool] = attr.ib(default=True)
     type_field: Optional[str] = attr.ib(default="_type")
-    types: Optional[MappingType] = attr.ib(default=None)
 
     @classmethod
     def from_dict(cls, json_data: dict):
@@ -179,14 +196,12 @@ class MappingDefault:
             json_data.get("default_analyzer"),
             json_data.get("default_datetime_parser"),
             json_data.get("default_field"),
-            DefaultMappingDefault.from_dict(json_data.get("default_mapping")) if json_data.get("default_mapping", {}).get("properties")
-            else DefaultMappingScoped.from_dict(json_data.get("default_mapping")),
+            DefaultMappingDefault.from_dict(json_data.get("default_mapping")),
             json_data.get("default_type"),
             json_data.get("docvalues_dynamic"),
             json_data.get("index_dynamic"),
             json_data.get("store_dynamic"),
             json_data.get("type_field"),
-            None,
         )
 
 
