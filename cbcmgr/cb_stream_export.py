@@ -94,7 +94,6 @@ class StreamExport(CBOperation):
     def read_from_collection(self):
         total = 0
         for doc_list in self.slice(self.doc_list(), self.batch_size):
-            print(len(doc_list))
             self.tasks.clear()
             for doc_id in doc_list:
                 self.tasks.add(self.executor.submit(self.get_worker, doc_id))
