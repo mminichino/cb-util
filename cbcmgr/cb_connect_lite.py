@@ -1,7 +1,7 @@
 ##
 ##
-import attrs
 
+import attrs
 from .exceptions import (IndexInternalError, CollectionGetError, CollectionCountError, BucketCreateException)
 from .retry import retry
 from .cb_session import CBSession, BucketMode
@@ -20,7 +20,8 @@ from couchbase.cluster import Cluster
 from couchbase.bucket import Bucket
 from couchbase.scope import Scope
 from couchbase.collection import Collection
-from couchbase.options import QueryOptions, SearchOptions, WaitUntilReadyOptions
+from couchbase.options import QueryOptions, SearchOptions, WaitUntilReadyOptions, ScanOptions
+from couchbase.kv_range_scan import RangeScan
 from couchbase.management.search import SearchIndex
 from couchbase.management.users import Role, User, Group
 from couchbase.management.buckets import CreateBucketSettings, BucketType, EvictionPolicyType, CompressionMode, ConflictResolutionType
@@ -190,6 +191,21 @@ class CBConnectLite(CBSession):
             return count
         except Exception as err:
             raise CollectionCountError(f"failed to get count for {keyspace}: {err}")
+
+    @staticmethod
+    def scan(collection: Collection):
+        scan_type = RangeScan()
+        scanner = collection.scan(scan_type, ScanOptions(ids_only=True, concurrency=100))
+        for res in scanner.rows():
+            yield res.id
+
+    @staticmethod
+    def get_doc(collection: Collection, doc_id: str) -> dict:
+        return collection.get(doc_id).content_as[dict]
+
+    @staticmethod
+    def put_doc(collection: Collection, doc_id: str, data: dict):
+        return collection.upsert(doc_id, data).cas
 
     @property
     def user_list(self):

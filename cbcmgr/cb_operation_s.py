@@ -218,6 +218,16 @@ class CBOperation(CBConnectLite):
                            similarity,
                            text_field)
 
+    def doc_list(self):
+        for doc_id in self.scan(self._collection):
+            yield doc_id
+
+    def get(self, doc_id: str):
+        return self.get_doc(self._collection, doc_id)
+
+    def put(self, doc_id: str, data: dict):
+        return self.put_doc(self._collection, doc_id, data)
+
     def get_count(self) -> int:
         return self.collection_count(self._cluster, self.get_keyspace)
 

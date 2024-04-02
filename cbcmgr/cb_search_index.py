@@ -12,7 +12,9 @@ class CBSearchIndex:
     mapping: Optional[MappingScoped] = attr.ib(default=None)
 
     @classmethod
-    def create(cls, name: str, dims=1536, vector_field=None, similarity="l2_norm", text_field=None, default=False):
+    def create(cls, name=None, dims=1536, vector_field=None, similarity="l2_norm", text_field=None, default=False):
+        if not vector_field and not text_field:
+            raise ValueError("Either the vector or text field parameter is required")
         if default:
             mapping = MappingDefault()
             if vector_field:
@@ -20,6 +22,8 @@ class CBSearchIndex:
             if text_field:
                 mapping.default_mapping.add_text(text_field)
         else:
+            if not name:
+                raise ValueError("Name parameter is required for scoped index")
             mapping = MappingScoped()
             map_types = MappingTypes().create()
             if vector_field:
