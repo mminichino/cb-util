@@ -51,6 +51,21 @@ def ask_for_password():
             print("[!] Passwords do not match, please try again ...")
 
 
+def progress_bar(iteration, total, decimals=1, length=100, fill='#', errors=0, ops_per_sec=0.0, end="\r"):
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filled = int(length * iteration // total)
+    bar = fill * filled + '-' * (length - filled)
+    print(f'\rProgress: |{bar}| {percent}% Complete - Errors: {errors} Ops/s: {ops_per_sec:.1f}', end=end)
+    if iteration == total:
+        print()
+
+
+def progress_count(count, finished=False, errors=0, ops_per_sec=0.0, end="\r"):
+    print(f'\rProgress: | {count:>20,} Documents | Errors: {errors} Ops/s: {ops_per_sec:.1f}', end=end)
+    if finished:
+        print()
+
+
 class MPValue(object):
 
     def __init__(self, i=0):

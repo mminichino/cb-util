@@ -199,14 +199,6 @@ class CBConnectLite(CBSession):
         for res in scanner.rows():
             yield res.id
 
-    @staticmethod
-    def get_doc(collection: Collection, doc_id: str) -> dict:
-        return collection.get(doc_id).content_as[dict]
-
-    @staticmethod
-    def put_doc(collection: Collection, doc_id: str, data: dict):
-        return collection.upsert(doc_id, data).cas
-
     @property
     def user_list(self):
         if self._cluster is None:
