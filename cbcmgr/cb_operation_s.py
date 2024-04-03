@@ -214,7 +214,7 @@ class CBOperation(CBConnectLite):
     def vector_search(self, index: str, field: str, vector: List[float]):
         return self._vector_search(self._scope, self._collection, index, field, vector)
 
-    def vector_index(self, name: str, dims=1536, vector_field="vector_field", similarity="l2_norm", text_field=None, default=False):
+    def vector_index(self, name: str, dims=1536, vector_field="vector_field", similarity="l2_norm", text_field=None, default=False, metadata=False):
         self._vector_index(self._scope,
                            self._bucket_name,
                            self._scope_name,
@@ -224,7 +224,8 @@ class CBOperation(CBConnectLite):
                            vector_field,
                            similarity,
                            text_field,
-                           default)
+                           default,
+                           metadata)
 
     def doc_list(self):
         query = f"select meta().id from {self.from_keyspace} ;"

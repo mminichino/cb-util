@@ -318,9 +318,10 @@ class CBConnectLite(CBSession):
                       vector_field="vector_field",
                       similarity="l2_norm",
                       text_field=None,
-                      default=False):
+                      default=False,
+                      metadata=False):
         sixm = scope.search_indexes()
-        search_index = CBSearchIndex().create(f"{scope_name}.{collection_name}", dims, vector_field, similarity, text_field, default)
+        search_index = CBSearchIndex().create(f"{scope_name}.{collection_name}", dims, vector_field, similarity, text_field, default, metadata)
         parameters = attrs.asdict(search_index)
 
         idx = SearchIndex(name=name,

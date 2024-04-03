@@ -12,7 +12,7 @@ class CBSearchIndex:
     mapping: Optional[MappingScoped] = attr.ib(default=None)
 
     @classmethod
-    def create(cls, name=None, dims=1536, vector_field=None, similarity="l2_norm", text_field=None, default=False):
+    def create(cls, name=None, dims=1536, vector_field=None, similarity="l2_norm", text_field=None, default=False, metadata=False):
         if not vector_field and not text_field:
             raise ValueError("Either the vector or text field parameter is required")
         if default:
@@ -21,6 +21,8 @@ class CBSearchIndex:
                 mapping.default_mapping.add_vector(dims, vector_field, similarity)
             if text_field:
                 mapping.default_mapping.add_text(text_field)
+            if metadata:
+                mapping.default_mapping.add_metadata()
         else:
             if not name:
                 raise ValueError("Name parameter is required for scoped index")
@@ -30,6 +32,8 @@ class CBSearchIndex:
                 map_types.add_vector(dims, vector_field, similarity)
             if text_field:
                 map_types.add_text(text_field)
+            if metadata:
+                map_types.add_metadata()
             mapping.types = MappingType(map_types).as_name(name)
         return cls(
             DocConfig.create(default),
@@ -139,7 +143,7 @@ class DefaultMappingDefault:
         return cls(
             True,
             True,
-            Metadata.create().as_dict
+            {}
         )
 
     def add_vector(self, dims=1536, vector_field="vector_field", similarity="l2_norm"):
@@ -148,6 +152,10 @@ class DefaultMappingDefault:
 
     def add_text(self, text_field="text"):
         _property = TextProperty().create(text_field).as_name(text_field)
+        self.properties.update(_property)
+
+    def add_metadata(self):
+        _property = Metadata.create().as_dict
         self.properties.update(_property)
 
     @classmethod
@@ -253,6 +261,10 @@ class MappingTypes:
 
     def add_text(self, text_field="text"):
         _property = TextProperty().create(text_field).as_name(text_field)
+        self.properties.update(_property)
+
+    def add_metadata(self):
+        _property = Metadata.create().as_dict
         self.properties.update(_property)
 
     @classmethod
