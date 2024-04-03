@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 import attr
-from typing import List, Optional
+from typing import List, Optional, Union
 
 
 @attr.s
@@ -12,13 +12,20 @@ class CBSearchIndex:
     mapping: Optional[MappingScoped] = attr.ib(default=None)
 
     @classmethod
-    def create(cls, name=None, dims=1536, vector_field=None, similarity="l2_norm", text_field=None, default=False, metadata=False):
-        if not vector_field and not text_field:
+    def create(cls,
+               name: str = None,
+               dims: int = 1536,
+               vector_fields: Union[List[str], None] = None,
+               similarity: str = "dot_product",
+               text_field: Union[str, None] = None,
+               default: bool = False,
+               metadata: bool = False):
+        if not vector_fields and not text_field:
             raise ValueError("Either the vector or text field parameter is required")
         if default:
             mapping = MappingDefault()
-            if vector_field:
-                mapping.default_mapping.add_vector(dims, vector_field, similarity)
+            if vector_fields:
+                mapping.default_mapping.add_vector(vector_fields, dims, similarity)
             if text_field:
                 mapping.default_mapping.add_text(text_field)
             if metadata:
@@ -28,8 +35,8 @@ class CBSearchIndex:
                 raise ValueError("Name parameter is required for scoped index")
             mapping = MappingScoped()
             map_types = MappingTypes().create()
-            if vector_field:
-                map_types.add_vector(dims, vector_field, similarity)
+            if vector_fields:
+                map_types.add_vector(vector_fields, dims, similarity)
             if text_field:
                 map_types.add_text(text_field)
             if metadata:
@@ -146,9 +153,10 @@ class DefaultMappingDefault:
             {}
         )
 
-    def add_vector(self, dims=1536, vector_field="vector_field", similarity="l2_norm"):
-        _property = VectorProperty().create(dims, vector_field, similarity).as_name(vector_field)
-        self.properties.update(_property)
+    def add_vector(self, vector_fields: List[str], dims=1536, similarity="dot_product"):
+        for vector_field in vector_fields:
+            _property = VectorProperty().create(dims, vector_field, similarity).as_name(vector_field)
+            self.properties.update(_property)
 
     def add_text(self, text_field="text"):
         _property = TextProperty().create(text_field).as_name(text_field)
@@ -255,9 +263,10 @@ class MappingTypes:
             {}
         )
 
-    def add_vector(self, dims=1536, vector_field="vector_field", similarity="l2_norm"):
-        _property = VectorProperty().create(dims, vector_field, similarity).as_name(vector_field)
-        self.properties.update(_property)
+    def add_vector(self, vector_fields: List[str], dims=1536, similarity="dot_product"):
+        for vector_field in vector_fields:
+            _property = VectorProperty().create(dims, vector_field, similarity).as_name(vector_field)
+            self.properties.update(_property)
 
     def add_text(self, text_field="text"):
         _property = TextProperty().create(text_field).as_name(text_field)
@@ -284,7 +293,7 @@ class VectorProperty:
     vector_field: Optional[VectorField] = attr.ib(default=None)
 
     @classmethod
-    def create(cls, dims=1536, vector_field="vector_field", similarity="l2_norm"):
+    def create(cls, dims=1536, vector_field="vector_field", similarity="dot_product"):
         field = VectorField()
         field.fields = [VectorFields(dims=dims, name=vector_field, similarity=similarity)]
         return cls(
@@ -365,12 +374,12 @@ class VectorFields:
     dims: Optional[int] = attr.ib(default=1536)
     index: Optional[bool] = attr.ib(default=True)
     name: Optional[str] = attr.ib(default="vector_field")
-    similarity: Optional[str] = attr.ib(default="l2_norm")
+    similarity: Optional[str] = attr.ib(default="dot_product")
     vector_index_optimized_for: Optional[str] = attr.ib(default="recall")
     type: Optional[str] = attr.ib(default="vector")
 
     @classmethod
-    def create(cls, dims=1536, name="vector_field", similarity="l2_norm"):
+    def create(cls, dims=1536, name="vector_field", similarity="dot_product"):
         return cls(
             dims,
             True,

@@ -214,14 +214,14 @@ class CBOperation(CBConnectLite):
     def vector_search(self, index: str, field: str, embedding: List[float], k: int = 4, fields: List[str] = None, search_options: Dict[str, Any] = None):
         return self._vector_search(self._scope, self._collection, index, field, embedding, k, fields, search_options)
 
-    def vector_index(self, name: str, dims=1536, vector_field="vector_field", similarity="l2_norm", text_field=None, default=False, metadata=False):
+    def vector_index(self, name: str, vector_fields: List[str], dims=1536, similarity="dot_product", text_field=None, default=False, metadata=False):
         self._vector_index(self._scope,
                            self._bucket_name,
                            self._scope_name,
                            self._collection_name,
                            name,
+                           vector_fields,
                            dims,
-                           vector_field,
                            similarity,
                            text_field,
                            default,

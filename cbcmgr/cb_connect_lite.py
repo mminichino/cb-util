@@ -325,14 +325,16 @@ class CBConnectLite(CBSession):
                       scope_name: str,
                       collection_name: str,
                       name: str,
+                      vector_fields: List[str],
                       dims=1536,
-                      vector_field="vector_field",
-                      similarity="l2_norm",
+                      similarity="dot_product",
                       text_field=None,
                       default=False,
                       metadata=False):
+        if vector_fields is None:
+            vector_fields = ["vector_field"]
         sixm = scope.search_indexes()
-        search_index = CBSearchIndex().create(f"{scope_name}.{collection_name}", dims, vector_field, similarity, text_field, default, metadata)
+        search_index = CBSearchIndex().create(f"{scope_name}.{collection_name}", dims, vector_fields, similarity, text_field, default, metadata)
         parameters = attrs.asdict(search_index)
 
         idx = SearchIndex(name=name,
@@ -340,7 +342,10 @@ class CBConnectLite(CBSession):
                           source_name=bucket_name,
                           source_type='gocbcore',
                           params=parameters)
-        sixm.upsert_index(idx)
+        try:
+            sixm.upsert_index(idx)
+        except QueryIndexAlreadyExistsException:
+            pass
 
     @retry()
     def index_by_query(self, sql: str):
