@@ -13,7 +13,7 @@ from .cb_search_index import CBSearchIndex
 import logging
 import hashlib
 from datetime import timedelta
-from typing import Union, Dict, Any, List
+from typing import Union, Dict, Any, List, Tuple
 import couchbase.search as search
 from couchbase.diagnostics import ServiceType
 from couchbase.cluster import Cluster
@@ -301,9 +301,8 @@ class CBConnectLite(CBSession):
         result = collection.upsert(doc_id, document)
         return result.cas
 
-    def _vector_search(self,
-                       scope: Scope,
-                       collection: Collection,
+    @staticmethod
+    def _vector_search(scope: Scope,
                        index: str,
                        field: str,
                        embedding: List[float],
@@ -316,7 +315,26 @@ class CBConnectLite(CBSession):
             search_options = {}
         search_req = search.SearchRequest.create(VectorSearch.from_vector_query(VectorQuery(field, embedding, k)))
         search_iter = scope.search(index, search_req, SearchOptions(limit=k, fields=fields, raw=search_options))
-        results = [self.get_doc(collection, item.id) for item in search_iter.rows()]
+        results = [item for item in search_iter.rows()]
+        return results
+
+    @staticmethod
+    def _vector_multi_search(scope: Scope,
+                             index: str,
+                             embeddings: List[Tuple[str, List[float]]],
+                             k: int = 4,
+                             fields: List[str] = None,
+                             search_options: Dict[str, Any] = None):
+        if not fields:
+            fields = ['*']
+        if not search_options:
+            search_options = {}
+        query_list = []
+        for field, embedding in embeddings:
+            query_list.append(VectorQuery(field, embedding, k))
+        search_req = search.SearchRequest.create(VectorSearch(query_list))
+        search_iter = scope.search(index, search_req, SearchOptions(limit=k, fields=fields, raw=search_options))
+        results = [item for item in search_iter.rows()]
         return results
 
     @staticmethod
