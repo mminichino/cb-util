@@ -98,6 +98,21 @@ class MetaDataProperty:
 
 
 @attr.s
+class Metadata:
+    metadata: Optional[dict] = attr.ib()
+
+    @classmethod
+    def create(cls):
+        return cls(
+            MetaDataProperty(True, True).as_dict
+        )
+
+    @property
+    def as_dict(self):
+        return self.__dict__
+
+
+@attr.s
 class DefaultMappingScoped:
     dynamic: Optional[bool] = attr.ib()
     enabled: Optional[bool] = attr.ib()
@@ -124,7 +139,7 @@ class DefaultMappingDefault:
         return cls(
             True,
             True,
-            MetaDataProperty(True, True).as_dict
+            Metadata.create().as_dict
         )
 
     def add_vector(self, dims=1536, vector_field="vector_field", similarity="l2_norm"):
