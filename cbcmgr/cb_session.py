@@ -133,7 +133,7 @@ class CBSession(object):
     @property
     def keyspace(self):
         if self._scope_name != "_default" or self._collection_name != "_default":
-            return self._bucket.name + '.' + self._scope_name + '.' + self._collection_name
+            return f"{self._bucket.name}.{self._scope_name}.{self._collection_name}"
         else:
             return self._bucket.name
 

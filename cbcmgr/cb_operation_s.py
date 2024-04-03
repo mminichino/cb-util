@@ -191,6 +191,13 @@ class CBOperation(CBConnectLite):
         self._collection_connected = True
         return self
 
+    @property
+    def from_keyspace(self):
+        if self._scope_name != "_default" or self._collection_name != "_default":
+            return f"`{self._bucket_name}`.{self._scope_name}.{self._collection_name}"
+        else:
+            return f"`{self._bucket_name}`"
+
     def wait_for_collection(self, name: str = "_default"):
         self.collection_wait(self._bucket, self._scope, name)
 
@@ -219,8 +226,10 @@ class CBOperation(CBConnectLite):
                            text_field)
 
     def doc_list(self):
-        for doc_id in self.scan(self._collection):
-            yield doc_id
+        query = f"select meta().id from {self.from_keyspace} ;"
+        result = self.run_query(self._cluster, query)
+        for record in result:
+            yield record.get('id')
 
     def get(self, doc_id: str):
         return self.get_doc(self._collection, doc_id)
