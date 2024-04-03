@@ -301,10 +301,21 @@ class CBConnectLite(CBSession):
         result = collection.upsert(doc_id, document)
         return result.cas
 
-    def _vector_search(self, scope: Scope, collection: Collection, index: str, field: str, vector: List[float]):
-        search_req = search.SearchRequest.create(search.MatchAllQuery()).with_vector_search(
-            VectorSearch.from_vector_query(VectorQuery(field, vector)))
-        search_iter = scope.search(index, search_req, SearchOptions(limit=2))
+    def _vector_search(self,
+                       scope: Scope,
+                       collection: Collection,
+                       index: str,
+                       field: str,
+                       embedding: List[float],
+                       k: int = 4,
+                       fields: List[str] = None,
+                       search_options: Dict[str, Any] = None):
+        if not fields:
+            fields = ['*']
+        if not search_options:
+            search_options = {}
+        search_req = search.SearchRequest.create(VectorSearch.from_vector_query(VectorQuery(field, embedding, k)))
+        search_iter = scope.search(index, search_req, SearchOptions(limit=k, fields=fields, raw=search_options))
         results = [self.get_doc(collection, item.id) for item in search_iter.rows()]
         return results
 

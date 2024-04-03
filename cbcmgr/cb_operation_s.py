@@ -211,8 +211,8 @@ class CBOperation(CBConnectLite):
         except (BucketNotFoundException, BucketDoesNotExistException):
             pass
 
-    def vector_search(self, index: str, field: str, vector: List[float]):
-        return self._vector_search(self._scope, self._collection, index, field, vector)
+    def vector_search(self, index: str, field: str, embedding: List[float], k: int = 4, fields: List[str] = None, search_options: Dict[str, Any] = None):
+        return self._vector_search(self._scope, self._collection, index, field, embedding, k, fields, search_options)
 
     def vector_index(self, name: str, dims=1536, vector_field="vector_field", similarity="l2_norm", text_field=None, default=False, metadata=False):
         self._vector_index(self._scope,
