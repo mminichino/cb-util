@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 import logging
-from typing import Union, Dict, Any, List, Tuple
+from typing import Union, Dict, Any, List
 from enum import Enum
 from couchbase.cluster import Cluster
 from couchbase.bucket import Bucket
@@ -214,10 +214,10 @@ class CBOperation(CBConnectLite):
     def vector_search(self, index: str, field: str, embedding: List[float], k: int = 4, fields: List[str] = None, search_options: Dict[str, Any] = None):
         return self._vector_search(self._scope, index, field, embedding, k, fields, search_options)
 
-    def vector_multi_search(self, index: str, embeddings: List[Tuple[str, List[float]]], k: int = 4, fields: List[str] = None, search_options: Dict[str, Any] = None):
-        return self._vector_multi_search(self._scope, index, embeddings, k, fields, search_options)
+    def vector_multi_search(self, index: str, fields: List[str], embeddings: List[List[float]], k: int = 4, search_fields: List[str] = None, search_options: Dict[str, Any] = None):
+        return self._vector_multi_search(self._scope, index, fields, embeddings, k, search_fields, search_options)
 
-    def vector_index(self, name: str, vector_fields: List[str], dims=1536, similarity="dot_product", text_field=None, default=False, metadata=False):
+    def vector_index(self, name: str, vector_fields: List[str], dims: List[int], similarity="dot_product", text_field=None, default=False, metadata=False):
         self._vector_index(self._scope,
                            self._bucket_name,
                            self._scope_name,

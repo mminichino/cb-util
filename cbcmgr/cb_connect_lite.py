@@ -13,7 +13,7 @@ from .cb_search_index import CBSearchIndex
 import logging
 import hashlib
 from datetime import timedelta
-from typing import Union, Dict, Any, List, Tuple
+from typing import Union, Dict, Any, List
 import couchbase.search as search
 from couchbase.diagnostics import ServiceType
 from couchbase.cluster import Cluster
@@ -321,19 +321,20 @@ class CBConnectLite(CBSession):
     @staticmethod
     def _vector_multi_search(scope: Scope,
                              index: str,
-                             embeddings: List[Tuple[str, List[float]]],
+                             fields: List[str],
+                             embeddings: List[List[float]],
                              k: int = 4,
-                             fields: List[str] = None,
+                             search_fields: List[str] = None,
                              search_options: Dict[str, Any] = None):
         if not fields:
-            fields = ['*']
+            search_fields = ['*']
         if not search_options:
             search_options = {}
         query_list = []
-        for field, embedding in embeddings:
+        for field, embedding in zip(fields, embeddings):
             query_list.append(VectorQuery(field, embedding, k))
         search_req = search.SearchRequest.create(VectorSearch(query_list))
-        search_iter = scope.search(index, search_req, SearchOptions(limit=k, fields=fields, raw=search_options))
+        search_iter = scope.search(index, search_req, SearchOptions(limit=k, fields=search_fields, raw=search_options))
         results = [item for item in search_iter.rows()]
         return results
 
@@ -344,7 +345,7 @@ class CBConnectLite(CBSession):
                       collection_name: str,
                       name: str,
                       vector_fields: List[str],
-                      dims=1536,
+                      dims: List[int],
                       similarity="dot_product",
                       text_field=None,
                       default=False,

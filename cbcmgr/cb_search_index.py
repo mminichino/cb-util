@@ -14,7 +14,7 @@ class CBSearchIndex:
     @classmethod
     def create(cls,
                name: str = None,
-               dims: int = 1536,
+               dims: Union[List[int], None] = None,
                vector_fields: Union[List[str], None] = None,
                similarity: str = "dot_product",
                text_field: Union[str, None] = None,
@@ -153,9 +153,9 @@ class DefaultMappingDefault:
             {}
         )
 
-    def add_vector(self, vector_fields: List[str], dims=1536, similarity="dot_product"):
-        for vector_field in vector_fields:
-            _property = VectorProperty().create(dims, vector_field, similarity).as_name(vector_field)
+    def add_vector(self, vector_fields: List[str], dims: List[int], similarity="dot_product"):
+        for vector_field, dim in zip(vector_fields, dims):
+            _property = VectorProperty().create(dim, vector_field, similarity).as_name(vector_field)
             self.properties.update(_property)
 
     def add_text(self, text_field="text"):
@@ -263,9 +263,9 @@ class MappingTypes:
             {}
         )
 
-    def add_vector(self, vector_fields: List[str], dims=1536, similarity="dot_product"):
-        for vector_field in vector_fields:
-            _property = VectorProperty().create(dims, vector_field, similarity).as_name(vector_field)
+    def add_vector(self, vector_fields: List[str], dims: List[int], similarity="dot_product"):
+        for vector_field, dim in zip(vector_fields, dims):
+            _property = VectorProperty().create(dim, vector_field, similarity).as_name(vector_field)
             self.properties.update(_property)
 
     def add_text(self, text_field="text"):
