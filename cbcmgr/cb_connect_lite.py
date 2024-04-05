@@ -326,7 +326,7 @@ class CBConnectLite(CBSession):
                              k: int = 4,
                              search_fields: List[str] = None,
                              search_options: Dict[str, Any] = None):
-        if not fields:
+        if not search_fields:
             search_fields = ['*']
         if not search_options:
             search_options = {}
