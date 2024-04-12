@@ -84,6 +84,7 @@ class CBCUtil(CLI):
         command_subparser.add_parser('get', help="Get Data", parents=[opt_parser], add_help=False)
         command_subparser.add_parser('schema', help="Schema Admin", parents=[opt_parser], add_help=False)
         command_subparser.add_parser('import', help="Import Data", parents=[opt_parser], add_help=False)
+        command_subparser.add_parser('bucket', help="Bucket Info", parents=[opt_parser], add_help=False)
         export_parser = command_subparser.add_parser('export', help="Export Data", parents=[opt_parser], add_help=False)
         export_subparser = export_parser.add_subparsers(dest='export_command')
         export_subparser.add_parser('csv', help="Export CSV", parents=[opt_parser], add_help=False)
@@ -120,6 +121,8 @@ class CBCUtil(CLI):
                 Replicator(self.options.filter).source()
             elif self.options.replicate_command == 'target':
                 Replicator(deferred=self.options.defer).target()
+        elif self.options.command == 'bucket':
+            MainLoop().bucket_info()
         else:
             if config.op_mode == OperatingMode.LOAD.value and self.options.schema:
                 MainLoop().schema_load()

@@ -1,6 +1,6 @@
 #
 #
-
+import enum
 import logging
 import json
 import re
@@ -28,6 +28,14 @@ class MainLoop(object):
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
         rand.rand_init()
+
+    @staticmethod
+    def bucket_info():
+        dbm = CBManager(config.host, config.username, config.password, ssl=config.tls, project=config.capella_project, database=config.capella_db).connect()
+        bucket = dbm.get_bucket(config.bucket_name)
+        for attribute in bucket:
+            value = bucket[attribute].name if isinstance(bucket[attribute], enum.Enum) else bucket[attribute]
+            print(f"{attribute}: {value}")
 
     @staticmethod
     def prep_bucket(name, scope, collection, quota: int = 256):
