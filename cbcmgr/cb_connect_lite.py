@@ -29,7 +29,8 @@ from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import CreateQueryIndexOptions, CreatePrimaryQueryIndexOptions, WatchQueryIndexOptions
 from couchbase.vector_search import VectorQuery, VectorSearch
 from couchbase.exceptions import (BucketNotFoundException, ScopeNotFoundException, CollectionNotFoundException, BucketAlreadyExistsException, ScopeAlreadyExistsException,
-                                  CollectionAlreadyExistsException, QueryIndexAlreadyExistsException, DocumentNotFoundException, WatchQueryIndexTimeoutException)
+                                  CollectionAlreadyExistsException, QueryIndexAlreadyExistsException, DocumentNotFoundException, WatchQueryIndexTimeoutException,
+                                  BucketDoesNotExistException, BucketNotFlushableException)
 
 logger = logging.getLogger('cbutil.connect.lite')
 logger.addHandler(logging.NullHandler())
@@ -118,6 +119,11 @@ class CBConnectLite(CBSession):
                 pass
 
         self._cluster.wait_until_ready(timedelta(seconds=10), WaitUntilReadyOptions(service_types=[ServiceType.KeyValue]))
+
+    @retry(always_raise_list=(BucketDoesNotExistException, BucketNotFlushableException))
+    def flush_bucket(self, cluster: Cluster, name: str):
+        bm = cluster.buckets()
+        bm.flush_bucket(name)
 
     @retry(always_raise_list=(ScopeNotFoundException,))
     def get_scope(self, bucket: Bucket, name: str = "_default") -> Scope:

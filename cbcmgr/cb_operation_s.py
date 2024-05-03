@@ -211,6 +211,9 @@ class CBOperation(CBConnectLite):
         except (BucketNotFoundException, BucketDoesNotExistException):
             pass
 
+    def flush(self):
+        self.flush_bucket(self._cluster, self._bucket_name)
+
     def vector_search(self, index: str, field: str, embedding: List[float], k: int = 4, fields: List[str] = None, search_options: Dict[str, Any] = None):
         return self._vector_search(self._scope, index, field, embedding, k, fields, search_options)
 
