@@ -22,7 +22,7 @@ setup(
     package_data={'cbcmgr': ['data/*']},
     install_requires=[
         "attrs>=22.2.0",
-        "couchbase>=4.2.0",
+        "couchbase>=4.2.1",
         "dnspython>=2.3.0",
         "docker>=5.0.3",
         "pytest>=7.0.1",
@@ -35,11 +35,11 @@ setup(
         "Jinja2==3.1.2",
         "pandas>=1.5.3",
         "numpy>=1.24.3",
-        "Pillow>=8.4.0",
+        "pillow>=8.4.0",
         "aiohttp>=3.9.1",
         "python-certifi-win32>=1.6.1",
-        "certifi~=2023.7.22",
-        "setuptools~=65.5.1"
+        "certifi>=2023.7.22",
+        "setuptools>=65.5.1"
     ],
     author_email='info@unix.us.com',
     description='Couchbase connection manager',
