@@ -456,8 +456,11 @@ class NetworkDriver(object):
 
 class Capella(object):
 
-    def __init__(self, organization_id=None, project_id=None, profile='default'):
-        self.rest = RESTManager(profile=profile)
+    def __init__(self, organization_id=None, project_id=None, profile='default', api_key=None):
+        if api_key:
+            self.rest = RESTManager(token=api_key)
+        else:
+            self.rest = RESTManager(profile=profile)
         self.cf = CapellaConfigFile(profile)
 
         self._cluster_id = None

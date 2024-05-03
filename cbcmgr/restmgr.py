@@ -52,6 +52,23 @@ class CapellaAuth(AuthBase):
         return self.request_headers
 
 
+class BearerAuth(AuthBase):
+
+    def __init__(self, token: str):
+        self.token = token
+
+        self.request_headers = {
+            "Authorization": f"Bearer {self.token}",
+        }
+
+    def __call__(self, r):
+        r.headers.update(self.request_headers)
+        return r
+
+    def get_header(self):
+        return self.request_headers
+
+
 class BasicAuth(AuthBase):
 
     def __init__(self, username, password):
@@ -108,6 +125,8 @@ class RESTManager(object):
 
         if self.username is not None and self.password is not None:
             self.auth_class = BasicAuth(self.username, self.password)
+        elif self.token is not None:
+            self.auth_class = BearerAuth(self.token)
         else:
             cf = CapellaConfigFile(profile)
             cf.read_token()
