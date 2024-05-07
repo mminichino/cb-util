@@ -62,6 +62,7 @@ class CBSession(object):
         self.node_cycle = None
         self.cluster_info = None
         self.sw_version = None
+        self.os_platform = None
         self.memory_quota = None
         self.cluster_services = []
         self.memory_quota = 0
@@ -198,7 +199,8 @@ class CBSession(object):
             return
 
         self.cluster_node_count = range(len(self.cluster_info['nodes']))
-        self.sw_version = self.cluster_info['nodes'][0]['version']
+        self.sw_version = self.cluster_info.get('nodes', [{}])[0].get('version')
+        self.os_platform = self.cluster_info.get('nodes', [{}])[0].get('os')
 
         for node in self.cluster_info['nodes']:
             node_name = node.get("configuredHostname").split(':')[0]

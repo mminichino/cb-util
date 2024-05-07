@@ -233,6 +233,9 @@ class CBOperation(CBConnectLite):
                            default,
                            metadata)
 
+    def search_index_count(self, name: str) -> int:
+        return self._search_index_count(self._cluster, self._bucket_name, self._scope_name, name)
+
     def doc_list(self):
         query = f"select meta().id from {self.from_keyspace} ;"
         result = self.run_query(self._cluster, query)

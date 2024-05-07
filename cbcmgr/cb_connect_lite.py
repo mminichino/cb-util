@@ -372,6 +372,11 @@ class CBConnectLite(CBSession):
         except QueryIndexAlreadyExistsException:
             pass
 
+    @staticmethod
+    def _search_index_count(cluster: Cluster, bucket_name: str, scope_name: str, name: str) -> int:
+        sixm = cluster.search_indexes()
+        return sixm.get_indexed_documents_count(f"{bucket_name}.{scope_name}.{name}")
+
     @retry()
     def index_by_query(self, sql: str):
         advisor = f"select advisor([\"{sql}\"])"
